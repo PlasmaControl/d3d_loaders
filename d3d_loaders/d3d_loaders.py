@@ -5,6 +5,12 @@ Implements an iterable dataset for the HDF5 data stored in
 /projects/EKOLEMEN/aza_lenny_data1
 """
 
+from os.path import join
+import math
+import h5py
+import torch
+
+
 
 class D3D_dataset(torch.utils.data.IterableDataset):
     """Implements an iterable dataset for D3D data.
@@ -27,7 +33,7 @@ class D3D_dataset(torch.utils.data.IterableDataset):
         """
 
         super(D3D_dataset).__init__()
-        from rcn_functions import preprocess_label
+        from d3d_loaders.rcn_functions import preprocess_label
         # Directory where ECE, Profiles, and Pnbi data are stored
         self.datapath = datapath
 
@@ -56,11 +62,10 @@ class D3D_dataset(torch.utils.data.IterableDataset):
         """Loads ECE at t0 and t0+50μs"""
         
         # Load ECE data at t0 and t0 + 50mus. dt for this data is 2mus
-        print("TODO: Check sampling")
         with h5py.File(join(self.datapath, "template", f"{shotnr}_ece.h5"), "r") as fp:
-            ece_t0_idx = np.squeeze(np.argwhere(fp["ece"]["xdata"][:]  < t0))[-1]
-            ece_data_0 = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][ece_t0_idx] for i in range(40)]).T
-            ece_data_1 = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][ece_t0_idx + 25] for i in range(40)]).T
+            ece_t0_idx = torch.squeeze(torch.argwhere(torch.tensor(fp["ece"]["xdata"][:])  < t0))[-1]
+            ece_data_0 = torch.vstack([torch.tensor(fp["ece"][f"tecef{(i+1):02d}"][ece_t0_idx]) for i in range(40)]).T
+            ece_data_1 = torch.vstack([torch.tensor(fp["ece"][f"tecef{(i+1):02d}"][ece_t0_idx + 25]) for i in range(40)]).T
             
         return (ece_data_0, ece_data_1)
     
@@ -68,9 +73,10 @@ class D3D_dataset(torch.utils.data.IterableDataset):
         """Loads sum of all pinj at t0 and t0+50ms"""
         # Load pinj data at t0 and t0 + 50ms. dt for this data is 10ms
         with h5py.File(join(self.datapath, "template", f"{shotnr}_pinj.h5")) as df_pinj:
-            pinj_t0_idx = np.squeeze(np.argwhere(df_pinj["pinjf_15l"]["xdata"][:]  < t0))[-1]
-            pinj_data_0 = sum([df_pinj[k]["zdata"][pinj_t0_idx] for k in df_pinj.keys()])
-            pinj_data_1 = sum([df_pinj[k]["zdata"][pinj_t0_idx + 5] for k in df_pinj.keys()])
+            xdata = torch.tensor(df_pinj["pinjf_15l"]["xdata"][:])
+            pinj_t0_idx = torch.squeeze(torch.argwhere(xdata  < t0))[-1]
+            pinj_data_0 = sum([torch.tensor(df_pinj[k]["zdata"][:])[pinj_t0_idx] for k in df_pinj.keys()])
+            pinj_data_1 = sum([torch.tensor(df_pinj[k]["zdata"][:])[pinj_t0_idx + 5] for k in df_pinj.keys()])
             
         return (pinj_data_0, pinj_data_1)
     
@@ -78,9 +84,10 @@ class D3D_dataset(torch.utils.data.IterableDataset):
         """Loads neutron emission rate at t0 and t0+50mus"""
         # Load neutron data at t0 and t0 + 50ms. dt for this data is 50ms
         with h5py.File(join(self.datapath, "template", f"{shotnr}_profiles.h5")) as df_prof:
-            neu_t0_idx = np.squeeze(np.argwhere(df_prof["neutronsrate"]["xdata"][:]  < t0))[-1]
-            neutron_data_0 = df_prof["neutronsrate"]["zdata"][neu_t0_idx]
-            neutron_data_1 = df_prof["neutronsrate"]["zdata"][neu_t0_idx + 1]
+            xdata = torch.tensor(df_prof["neutronsrate"]["xdata"][:])
+            neu_t0_idx = torch.squeeze(torch.argwhere(xdata  < t0))[-1]
+            neutron_data_0 = torch.tensor(df_prof["neutronsrate"]["zdata"][neu_t0_idx])
+            neutron_data_1 = torch.tensor(df_prof["neutronsrate"]["zdata"][neu_t0_idx + 1])
             
         return (neutron_data_0, neutron_data_1)
     
