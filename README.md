@@ -16,6 +16,6 @@ my_ds = D3D_dataset()
 
 Iteration over the dataset is done in pytorch-style:
 ```
-for i in torch.utils.data.DataLoaders(my_ds):
+for i in torch.utils.data.DataLoader(my_ds):
     # use i
 ```

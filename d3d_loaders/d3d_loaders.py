@@ -8,11 +8,13 @@ Implements an iterable dataset for the HDF5 data stored in
 from os.path import join
 import math
 import h5py
+import numpy as np
 import torch
 
+import pickle
+from rcn_functions import rcn_infer
 
-
-class D3D_dataset(torch.utils.data.IterableDataset):
+class D3D_dataset(torch.utils.data.Dataset):
     """Implements an iterable dataset for D3D data.
 
     Target is the HDF5 data stored in /projects/EKOLEMEN/aza_lenny_data1.
@@ -52,12 +54,18 @@ class D3D_dataset(torch.utils.data.IterableDataset):
         self.shot_list.sort()
         # Remove all rows for which there is no neutron data
         self.ece_label_df = self.ece_label_df[self.ece_label_df["shot"].isin(self.shot_list)]
-        
-        # Start and end for dataset iteration
-        self.start = 0
-        self.end = len(self.ece_label_df)
 
+        # Load RCN weights
+        with open('/home/rkube/ml4control/1dsignal-model-AE-ECE-RCN.pkl', 'rb') as df:
+            self.infer_data = pickle.load(df)
+        self.n_res_l1 = self.infer_data['layer1']['w_in'].shape[0]
+        self.n_res_l2 = self.infer_data['layer2']['w_in'].shape[0]
     
+
+    def __len__(self):
+        return len(self.ece_label_df)
+
+
     def fetch_data_ece(self, shotnr, t0):
         """Loads ECE at t0 and t0+50μs"""
         
@@ -91,22 +99,56 @@ class D3D_dataset(torch.utils.data.IterableDataset):
             
         return (neutron_data_0, neutron_data_1)
     
+    def ae_mode_prob(self, shotnr, t0):
+        """Forward pass for RCN model that predicts AE mode probabilities."""
+        ece_data_0, ece_data_1 = self.fetch_data_ece(shotnr, t0)
+        ece_data_0 = np.squeeze(ece_data_0.numpy())
+        ece_data_1 = np.squeeze(ece_data_1.numpy())
+        r_prev = {"layer1": np.zeros(self.n_res_l1),
+                  "layer2": np.zeros(self.n_res_l2)} 
 
-    def __iter__(self):
-        """Implements iteration over valid shots."""
-        worker_info = torch.utils.data.get_worker_info()
-        if worker_info is None: # single-process loading, return the full iterator
-            iter_start = self.start
-            iter_end = self.end
-        else: # in a worker process
-            per_worker = int(math.ceil((self.end - self.start) / float(worker_info.num_workers)))
-            worker_id = worker_info.id
-            iter_start = self.start + worker_id * per_worker
-            iter_end = min(iter_start + per_worker, self.end)
-            
-        # start and end both refer to a row in the event dataframe.
-        # Each event consists of a shot and time-in-shot
-        return iter([(self.fetch_data_ece(shotnr, t), 
-                      self.fetch_data_pinj(shotnr, t),
-                      self.fetch_data_neu(shotnr, t))] for shotnr, t in zip(self.ece_label_df[["shot"]].iloc[iter_start:iter_end].shot,
-                                                                            self.ece_label_df[["time"]].iloc[iter_start:iter_end].time))
+        ae_mode_probs = []
+        for u in [ece_data_0, ece_data_1]:
+            u = (u - self.infer_data['mean']) / self.infer_data['std'] #Normalizing the input
+            L = "layer1"
+            r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
+                                     self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
+                                     self.infer_data[L]['leak_rate'], r_prev[L], u.T)
+
+            L = "layer2"
+            r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
+                                     self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
+                                     self.infer_data[L]['leak_rate'], r_prev[L], y)
+            ae_mode_probs.append(y)
+        ae_mode_probs = np.array(ae_mode_probs, dtype=np.float32)
+
+        return ae_mode_probs
+
+
+    def __getitem__(self, idx):
+        shotnr, t0 = self.ece_label_df[["shot", "time"]].iloc[idx]
+
+        ae_mode_prob_t0, ae_mode_prob_t1 = self.ae_mode_prob(shotnr, t0)
+        pinj_t0, pinj_t1 = self.fetch_data_pinj(shotnr, t0)
+        nrate_t0, nrate_t1 = self.fetch_data_neu(shotnr, t0)
+
+        return (ae_mode_prob_t0, pinj_t0, nrate_t0), (ae_mode_prob_t1, pinj_t1, nrate_t1)
+
+
+#        """Implements iteration over valid shots."""
+#        worker_info = torch.utils.data.get_worker_info()
+#        if worker_info is None: # single-process loading, return the full iterator
+#            iter_start = self.start
+#            iter_end = self.end
+#        else: # in a worker process
+#            per_worker = int(math.ceil((self.end - self.start) / float(worker_info.num_workers)))
+#            worker_id = worker_info.id
+#            iter_start = self.start + worker_id * per_worker
+#            iter_end = min(iter_start + per_worker, self.end)
+#            
+#        # start and end both refer to a row in the event dataframe.
+#        # Each event consists of a shot and time-in-shot
+#        return iter((self.fetch_data_ece(shotnr, t), 
+#                     self.fetch_data_pinj(shotnr, t),
+#                     self.fetch_data_neu(shotnr, t)) for shotnr, t in zip(self.ece_label_df[["shot"]].iloc[iter_start:iter_end].shot,
+                                                                            #self.ece_label_df[["time"]].iloc[iter_start:iter_end].time))
