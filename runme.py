@@ -11,7 +11,7 @@ print(my_ds.ece_label_df[["shot", "time"]])
 # Test iteration
 num_iter = 0
 for i in torch.utils.data.DataLoader(my_ds, num_workers=1):
-    print(num_iter)
+    print(num_iter) 
     num_iter += 1
 
 print(f"{num_iter} iterations")
