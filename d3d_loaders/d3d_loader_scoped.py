@@ -17,12 +17,16 @@ from rcn_functions import rcn_infer
 
 import logging
 
-class D3D_dataset(torch.utils.data.Dataset):
+class D3D_dataset_scoped(torch.utils.data.Dataset):
     """Implements an iterable dataset for D3D data.
 
     Target is the HDF5 data stored in /projects/EKOLEMEN/aza_lenny_data1.
     
     https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset
+
+    This is a scoped loader. Since all data files are  indiviudal H5 files for shots/diagnostics,
+    we open them all during initialization. File handles are stored in a dict. 
+    Files are closed when __exit__is called
     """
     def __init__(self, datapath="/projects/EKOLEMEN/aza_lenny_data1"):
         """Initializes the dataloader. 
@@ -67,6 +71,16 @@ class D3D_dataset(torch.utils.data.Dataset):
         self.n_res_l1 = self.infer_data['layer1']['w_in'].shape[0]
         self.n_res_l2 = self.infer_data['layer2']['w_in'].shape[0]
     
+
+    def __enter__(self):
+        """Cache all hdf5 file handles."""
+        # File handles 
+        self.ece_fh = {}
+        self.neu_fh = {}
+        self.pin_fh = {}
+
+    def __exit__(self):
+        """Clear all hdf5 file handles"""
 
     def __len__(self):
         return len(self.ece_label_df)
