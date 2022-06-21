@@ -60,6 +60,9 @@ i
         self.tend = tend
         self.tsample = tsample # Sub-sample all signals at this frequency
 
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        logging.info(f"Using device {device}")
+
         assert(tstart < tend)
         assert((tend - tstart) > tsample)
 
@@ -94,10 +97,21 @@ i
         self.data_neut_std = self.data_neut.std()
         self.data_neut = (self.data_neut - self.data_neut_mean) / self.data_neut_std
 
+        # Assert that all data has the same number of samples
+        assert(self.ae_probs.shape[0] == self.ae_probs_delta.shape[0])
+        assert(self.ae_probs.shape[0] == self.data_pinj.shape[0])
+        assert(self.ae_probs.shape[0] == self.data_neut.shape[0])
+
+        # Move tensors to device if available
+        self.ae_probs = self.ae_probs.to(device)
+        self.ae_probs_delta = self.ae_probs_delta.to(device)
+        self.data_pinj = self.data_pinj.to(device)
+        self.data_neut = self.data_neut.to(device)
 
 
     def __len__(self):
-        return len(self.target_df)
+        # Returns the number of time samples
+        return self.ae_probs.shape[0]
 
 
     def _get_num_n_samples(self, dt):
@@ -122,58 +136,60 @@ i
 
         # Find how many samples apart tsample is
         t0_p = time.time()
-        with h5py.File(join(self.datapath, "template", f"{self.shotnr}_ece.h5"), "r") as fp:
-            tb_ece = fp["ece"]["xdata"][:]    # Get ECE time-base
-            dt_ece = np.diff(tb_ece).mean()   # Get ECE sampling time
-            num_samples, nth_sample = self._get_num_n_samples(dt_ece)
-            t0_idx = np.argmin(np.abs(tb_ece - self.tstart))
-            logging.info(f"Sampling ECE: t0_idx={t0_idx}, dt={dt_ece}, num_samples={num_samples}, nth_sample={nth_sample}")
+        # Don't use scope. This throws off multi-threaded loaders
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_ece.h5"), "r") 
+        tb_ece = fp["ece"]["xdata"][:]    # Get ECE time-base
+        dt_ece = np.diff(tb_ece).mean()   # Get ECE sampling time
+        num_samples, nth_sample = self._get_num_n_samples(dt_ece)
+        t0_idx = np.argmin(np.abs(tb_ece - self.tstart))
+        logging.info(f"Sampling ECE: t0_idx={t0_idx}, dt={dt_ece}, num_samples={num_samples}, nth_sample={nth_sample}")
 
-            # Read in all ece_data at t0 and shifted at t0 + 50 mus
-            ece_data_0 = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t0_idx:t0_idx + num_samples:nth_sample ] for i in range(40)]).T
-            ece_data_1 = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t0_idx + 25:t0_idx + 25 + num_samples:nth_sample] for i in range(40)]).T
-            # After this we have ece_data_0.shape = (num_samples / nth_sample, 40)
+        # Read in all ece_data at t0 and shifted at t0 + 50 mus
+        ece_data_0 = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t0_idx:t0_idx + num_samples:nth_sample ] for i in range(40)]).T
+        ece_data_1 = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t0_idx + 25:t0_idx + 25 + num_samples:nth_sample] for i in range(40)]).T
+        # After this we have ece_data_0.shape = (num_samples / nth_sample, 40)
 
-            # Pre-allocate array for AE mode probabilities
-            # dim0: time index
-            # dim1: AE mode index 0...4
-            # dim2: 0: t0, 1: t0 + 50mus
-            ae_probs = np.zeros([ece_data_0.shape[0], 5, 2], dtype=np.float32)
+        # Pre-allocate array for AE mode probabilities
+        # dim0: time index
+        # dim1: AE mode index 0...4
+        # dim2: 0: t0, 1: t0 + 50mus
+        ae_probs = np.zeros([ece_data_0.shape[0], 5, 2], dtype=np.float32)
 
-            ece_data_0 = (ece_data_0 - self.infer_data["mean"]) / self.infer_data["std"]
-            ece_data_1 = (ece_data_1 - self.infer_data["mean"]) / self.infer_data["std"]
-            # Initialize to zero, overwrite in for loop
-            r_prev = {"layer1": np.zeros(self.n_res_l1),
-                      "layer2": np.zeros(self.n_res_l2)} 
-            # Iterate over time index 0
-            for idx, u in enumerate(ece_data_0):
-                L = "layer1"
-                r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
-                                         self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
-                                         self.infer_data[L]['leak_rate'], r_prev[L], u.T)
+        ece_data_0 = (ece_data_0 - self.infer_data["mean"]) / self.infer_data["std"]
+        ece_data_1 = (ece_data_1 - self.infer_data["mean"]) / self.infer_data["std"]
+        # Initialize to zero, overwrite in for loop
+        r_prev = {"layer1": np.zeros(self.n_res_l1),
+                  "layer2": np.zeros(self.n_res_l2)} 
+        # Iterate over time index 0
+        for idx, u in enumerate(ece_data_0):
+            L = "layer1"
+            r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
+                                     self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
+                                     self.infer_data[L]['leak_rate'], r_prev[L], u.T)
 
-                L = "layer2"
-                r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
-                                         self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
-                                         self.infer_data[L]['leak_rate'], r_prev[L], y)
+            L = "layer2"
+            r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
+                                     self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
+                                     self.infer_data[L]['leak_rate'], r_prev[L], y)
 
-                ae_probs[idx, :, 0] = y[:]
+            ae_probs[idx, :, 0] = y[:]
 
-            # Re-set weights to zero and overwrite again in for-loop
-            r_prev = {"layer1": np.zeros(self.n_res_l1),
-                      "layer2": np.zeros(self.n_res_l2)} 
-            for idx, u in enumerate(ece_data_1):
-                L = "layer1"
-                r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
-                                         self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
-                                         self.infer_data[L]['leak_rate'], r_prev[L], u.T)
+        # Re-set weights to zero and overwrite again in for-loop
+        r_prev = {"layer1": np.zeros(self.n_res_l1),
+                  "layer2": np.zeros(self.n_res_l2)} 
+        for idx, u in enumerate(ece_data_1):
+            L = "layer1"
+            r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
+                                     self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
+                                     self.infer_data[L]['leak_rate'], r_prev[L], u.T)
 
-                L = "layer2"
-                r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
-                                         self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
-                                         self.infer_data[L]['leak_rate'], r_prev[L], y)
+            L = "layer2"
+            r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
+                                     self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
+                                     self.infer_data[L]['leak_rate'], r_prev[L], y)
 
-                ae_probs[idx, :, 1] = y[:]
+            ae_probs[idx, :, 1] = y[:]
+        fp.close()
         elapsed = time.time() - t0_p
 
         #if logger is not None:
@@ -188,51 +204,54 @@ i
         # Calculate samples for pinj data
         # Load pinj data at t0 and t0 + 50ms. dt for this data is 10ms
         t0_p = time.time()
-        with h5py.File(join(self.datapath, "template", f"{self.shotnr}_pinj.h5")) as fp_pinj:
-            tb_pinj = torch.tensor(fp_pinj["pinjf_15l"]["xdata"][:]) # Get time-base
-            dt_pinj = np.diff(tb_pinj).mean()                        # Get sampling time
-            dt_pinj = 0.01
-            # Get total number of samples and desired sub-sample spacing
-            num_samples, nth_sample = self._get_num_n_samples(dt_pinj)
-            t0_idx = torch.argmin(torch.abs(tb_pinj - self.tstart))
-            logging.info(f"Sampling pinj: t0_idx={t0_idx}, dt={dt_pinj}, num_samples={num_samples}, nth_sample={nth_sample}")
+        # Don't use with... scope. This throws off data_loader
+        fp_pinj = h5py.File(join(self.datapath, "template", f"{self.shotnr}_pinj.h5")) 
+        tb_pinj = torch.tensor(fp_pinj["pinjf_15l"]["xdata"][:]) # Get time-base
+        dt_pinj = np.diff(tb_pinj).mean()                        # Get sampling time
+        dt_pinj = 0.01
+        # Get total number of samples and desired sub-sample spacing
+        num_samples, nth_sample = self._get_num_n_samples(dt_pinj)
+        t0_idx = torch.argmin(torch.abs(tb_pinj - self.tstart))
+        logging.info(f"Sampling pinj: t0_idx={t0_idx}, dt={dt_pinj}, num_samples={num_samples}, nth_sample={nth_sample}")
 
-            pinj_data_0 = sum([torch.tensor(fp_pinj[k]["zdata"][:])[t0_idx:t0_idx + num_samples:nth_sample] for k in fp_pinj.keys()])
-            pinj_data_1 = sum([torch.tensor(fp_pinj[k]["zdata"][:])[t0_idx + 5:t0_idx + num_samples + 5:nth_sample] for k in fp_pinj.keys()])
+        pinj_data_0 = sum([torch.tensor(fp_pinj[k]["zdata"][:])[t0_idx:t0_idx + num_samples:nth_sample] for k in fp_pinj.keys()])
+        pinj_data_1 = sum([torch.tensor(fp_pinj[k]["zdata"][:])[t0_idx + 5:t0_idx + num_samples + 5:nth_sample] for k in fp_pinj.keys()])
+        fp_pinj.close()
 
         elapsed = time.time() - t0_p
         #if logger is not None:
         logging.info(f"Loading pinj for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
             
-        return torch.stack((pinj_data_0, pinj_data_1))
+        return torch.stack((pinj_data_0, pinj_data_1)).T
     
     def _cache_data_neut(self):
         """Loads neutron emission rate at t0 and t0+50mus"""
         # Load neutron data at t0 and t0 + 50ms. dt for this data is 50ms
         t0_p = time.time()
-        with h5py.File(join(self.datapath, "template", f"{self.shotnr}_profiles.h5")) as fp_prof:
+        # Don't use with... scope. This throws off dataloader
+        fp_prof = h5py.File(join(self.datapath, "template", f"{self.shotnr}_profiles.h5")) 
+    
+        tb_neu = torch.tensor(fp_prof["neutronsrate"]["xdata"][:])
+        dt_neu = np.diff(tb_neu).mean()
+        dt_neu = 0.02
+        num_samples, nth_sample = self._get_num_n_samples(dt_neu)
+        t0_idx = torch.argmin(torch.abs(tb_neu - self.tstart))
+        logging.info(f"Sampling neut: t0_idx={t0_idx}, dt={dt_neu}, num_samples={num_samples}, nth_sample={nth_sample}")
 
-            tb_neu = torch.tensor(fp_prof["neutronsrate"]["xdata"][:])
-            dt_neu = np.diff(tb_neu).mean()
-            dt_neu = 0.02
-            num_samples, nth_sample = self._get_num_n_samples(dt_neu)
-            t0_idx = torch.argmin(torch.abs(tb_neu - self.tstart))
-            logging.info(f"Sampling neut: t0_idx={t0_idx}, dt={dt_neu}, num_samples={num_samples}, nth_sample={nth_sample}")
-
-            neutron_data_0 = torch.tensor(fp_prof["neutronsrate"]["zdata"][t0_idx:t0_idx + num_samples:nth_sample])
-            neutron_data_1 = torch.tensor(fp_prof["neutronsrate"]["zdata"][t0_idx + 1:t0_idx + num_samples:nth_sample])
-            
+        neutron_data_0 = torch.tensor(fp_prof["neutronsrate"]["zdata"][t0_idx:t0_idx + num_samples:nth_sample])
+        neutron_data_1 = torch.tensor(fp_prof["neutronsrate"]["zdata"][t0_idx + 1:t0_idx + num_samples:nth_sample])
+        fp_prof.close()    
         elapsed = time.time() - t0_p
         #if logger is not None:
         logging.info(f"Loading neutron data for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
-        return torch.stack((neutron_data_0, neutron_data_1))
+        return torch.stack((neutron_data_0, neutron_data_1)).T
     
 
     def __getitem__(self, idx):
         """Fetch data corresponding to the idx'th sample."""
         data_t0 = torch.cat((self.ae_probs[idx, :], 
-                             self.data_neut[0, idx].unsqueeze(0), 
-                             self.data_pinj[0, idx].unsqueeze(0)))
+                             self.data_neut[idx, 0].unsqueeze(0), 
+                             self.data_pinj[idx, 0].unsqueeze(0)))
         data_t1 = self.ae_probs_delta[idx, :]
         return (data_t0, data_t1)
 #
