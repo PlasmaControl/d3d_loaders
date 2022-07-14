@@ -54,23 +54,6 @@ class signal_2d(signal_1d):
         logging.info(f"Loading {self.name} for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
            
         return prof_data.unsqueeze(1)
-    
-    def _get_time_sampling(self, tb):
-        """
-        Use the time base to calculate the variables for indexing 2d signal
-        
-        NOTE: This will be changed or moved since time sampling needs to be refined
-        """
-        if self.override_dt is None:
-            self.dt = (tb[1:] - tb[:-1]).mean()           # Get sampling time
-        else:
-            self.dt = self.override_dt
-        # Get total number of samples and desired sub-sample spacing
-        num_samples, nth_sample = self._get_num_n_samples(self.dt)
-        shift_smp = int(ceil(self.tshift/ self.dt))
-        t0_idx = torch.argmin(torch.abs(tb - self.tstart))
-        
-        return t0_idx, shift_smp, num_samples, nth_sample
 
 
 class signal_dens(signal_2d):
