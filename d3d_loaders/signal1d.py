@@ -65,7 +65,10 @@ class signal_1d():
         self.data_mean = self.data.mean()
         self.data_std = self.data.std()
         self.data = (self.data - self.data_mean) / self.data_std
-        logging.info(f"Compiled signal data for shot {shotnr}, mean={self.data_mean}, std={self.data_std}")
+        logging.info(f"""Compiled signal {self.__class__.__name__} for shot {shotnr}, 
+                         tstart={self.tstart}, tend={self.tend}, tsample={self.tsample}, tshift={self.tshift},
+                         override_dt={self.override_dt}, datapath={self.datapath}, 
+                         mean={self.data_mean}, std={self.data_std}""")
 
 
     def _get_num_n_samples(self, dt):
@@ -133,13 +136,12 @@ class signal_pinj(signal_1d):
         num_samples, nth_sample = self._get_num_n_samples(self.dt)
         shift_smp = int(ceil(self.tshift/ self.dt))
         t0_idx = torch.argmin(torch.abs(tb - self.tstart))
-        logging.info(f"Sampling pinj: t0_idx={t0_idx}, dt={self.dt}, num_samples={num_samples}, nth_sample={nth_sample}")
 
         pinj_data = sum([torch.tensor(fp[k]["zdata"][:])[t0_idx + shift_smp:t0_idx + shift_smp + num_samples:nth_sample] for k in fp.keys()])
         fp.close()
 
         elapsed = time.time() - t0_p
-        logging.info(f"Loading pinj for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
+        logging.info(f"Caching pinj data for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
            
         return pinj_data.unsqueeze(1)
 
@@ -167,13 +169,12 @@ class signal_neut(signal_1d):
         num_samples, nth_sample = self._get_num_n_samples(self.dt)  # Number of samples and sample spacing
         shift_smp = int(ceil(self.tshift/ self.dt))                  # Shift samples by this number into the fuiture
         t0_idx = torch.argmin(torch.abs(tb - self.tstart))
-        logging.info(f"Sampling neut: t0_idx={t0_idx}, dt={self.dt}, num_samples={num_samples}, nth_sample={nth_sample}")
 
         neutron_data = torch.tensor(fp["neutronsrate"]["zdata"][t0_idx + shift_smp:t0_idx + shift_smp + num_samples:nth_sample])
         fp.close()    
 
         elapsed = time.time() - t0_p       
-        logging.info(f"Loading neutron data for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
+        logging.info(f"Caching neutron data for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
 
 
         return neutron_data.unsqueeze(1)
@@ -185,7 +186,27 @@ class signal_ae_prob(signal_1d):
             tshift=0.0, override_dt=None, 
             datapath="/projects/EKOLEMEN/aza_lenny_data1",
             device="cpu"):
-        """Loads weights for RCN model and calls base class constructor."""
+        """Loads weights for RCN model and calls base class constructor.
+        
+        Parameters
+        ----------
+        shotnr : Int
+                 Shot number
+        tstart : float
+                 Start of signal interval, in milliseconds
+        tend : float
+               End of signal interval, in milliseconds
+        tsample : float
+                  Desired sampling time, in milliseconds
+        tshift : float, default=0.0
+                 Shift signal by tshift with respect to tstart, in milliseconds
+        override_dt : float, optional
+                      Use this value as sample spacing instead of calculating from xdata field in HDF5 file
+        datapath : string, default='/projects/EKOLEMEN/aza_lenny_data1'
+                   Basepath where HDF5 data is stored.  
+        device : string, default='cpu'
+                 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        """
         # The RCN model weights are needed to call the base-class constructor
         with open('/home/rkube/ml4control/1dsignal-model-AE-ECE-RCN.pkl', 'rb') as df:
             self.infer_data = pickle.load(df)
@@ -214,12 +235,15 @@ class signal_ae_prob(signal_1d):
         # Don't use scope. This throws off multi-threaded loaders
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_ece.h5"), "r") 
         tb = fp["ece"]["xdata"][:]    # Get ECE time-base
-        dt = np.diff(tb).mean()   # Get ECE sampling time
-        num_samples, nth_sample = self._get_num_n_samples(dt)
+
+        if self.override_dt is None:
+            self.dt = np.diff(tb).mean()
+        else:
+            self.dt = self.override_dt        
+        num_samples, nth_sample = self._get_num_n_samples(self.dt)
         
         shift_smp = int(ceil(self.tshift/ self.dt))
         t0_idx = np.argmin(np.abs(tb - self.tstart))
-        logging.info(f"Sampling ECE: t0_idx={t0_idx}, dt={dt}, num_samples={num_samples}, nth_sample={nth_sample}, shift_smp={shift_smp}")
 
         # Read in all ece_data at t0 and shifted at t0 + 50 mus
         ece_data = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t0_idx + shift_smp:t0_idx + shift_smp + num_samples:nth_sample ] for i in range(40)]).T
@@ -250,7 +274,7 @@ class signal_ae_prob(signal_1d):
 
         elapsed = time.time() - t0_p
 
-        logging.info(f"AE forward model for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
+        logging.info(f"Caching AE forward model using RCN, {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
 
         return torch.tensor(ae_probs)
 
@@ -261,8 +285,32 @@ class signal_ae_prob_delta(signal_1d):
             tshift=0.0, override_dt=None, 
             datapath="/projects/EKOLEMEN/aza_lenny_data1",
             device="cpu"):
-        """Construct difference in AE probability using two signal_ae_prob"""
+        """Construct difference in AE probability using two signal_ae_prob.
+        
+        Parameters
+        ----------
+        shotnr : Int
+                 Shot number
+        tstart : float
+                 Start of signal interval, in milliseconds
+        tend : float
+               End of signal interval, in milliseconds
+        tsample : float
+                  Desired sampling time, in milliseconds
+        tshift : float, default=0.0
+                 Shift signal by tshift with respect to tstart, in milliseconds
+        override_dt : float, optional
+                      Use this value as sample spacing instead of calculating from xdata field in HDF5 file
+        datapath : string, default='/projects/EKOLEMEN/aza_lenny_data1'
+                   Basepath where HDF5 data is stored.  
+        device : string, default='cpu'
+                 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+        Constructs a the change in Alfven Eigenmode probability using a finite difference method.
+        The signals are separated by t_shift.
+        """
+        
+        
         # Signal at t0
         signal_t0 = signal_ae_prob(shotnr, tstart, tend, tsample, tshift=0.0, 
                 override_dt=override_dt, datapath=datapath, device=device)
