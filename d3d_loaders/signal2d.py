@@ -52,8 +52,8 @@ class signal_2d(signal_1d):
 
         elapsed = time.time() - t0_p
         logging.info(f"Loading {self.name} for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
-           
-        return prof_data.unsqueeze(1)
+        
+        return prof_data
 
 
 class signal_dens(signal_2d):
@@ -278,6 +278,58 @@ class signal_tri_u(signal_2d):
         self.key = "triangularity_u"
         self.file_label = "shape"
         self.name = "upper triangularity"
+
+
+class signal_ece(signal_2d):
+    """Raw ECE signals
+
+    Returns
+    -------
+    ece_data : tensor
+                Data time series for profiles. dim0: ECE channels. dim1: samples
+    """
+    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, 
+                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu",
+                 channels=range(1,41)):
+        """
+        Unique part of constructor is channels. Can be any list of numbers from 1-40, or 
+        just an individual channel. 
+        """
+        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+        self.channels = channels
+        
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Assumes the xdata and zdata keys are present and data resides in the shotnr_profile.h5 files.
+        Other signals will need to override this function to cache data correctly.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: profile length. dim1: samples
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_ece.h5")) 
+        tb = torch.tensor(fp['ece']["xdata"][:]) # Get time-base
+        
+        t0_idx, shift_smp, num_samples, nth_sample = self._get_time_sampling(tb)
+        
+        logging.info(f"Sampling {self.name}: t0_idx={t0_idx}, dt={self.dt}, num_samples={num_samples}, nth_sample={nth_sample}")
+
+        # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"]
+                                           [t0_idx + shift_smp:t0_idx + shift_smp + num_samples:nth_sample,:] for channel in self.channels]))
+        fp.close()
+
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading {self.name} for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
+
 
 class signal_ece_spec(signal_2d):
     """_summary_
