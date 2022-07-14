@@ -57,14 +57,11 @@ class D3D_dataset(torch.utils.data.Dataset):
         """
 
         super(D3D_dataset).__init__()
-        # Directory where ECE, Profiles, and Pnbi data are stored
         self.datapath = datapath
-        # Shot number
         self.shotnr = shotnr
-        # Set up sampling interval for data.
         self.tstart = tstart
         self.tend = tend
-        self.tsample = tsample # Sub-sample all signals at this frequency
+        self.tsample = tsample 
         self.shift_target = shift_target
 
         logging.info(f"Using device {device}")
@@ -122,17 +119,24 @@ class D3D_dataset(torch.utils.data.Dataset):
 
 
     def __len__(self):
-        # Returns the number of time samples
+        """Returns the number of time samples."""
         k = next(iter(self.predictors.keys()))
         return self.predictors[k].data.shape[0]
 
    
     def __getitem__(self, idx):
-        """Fetch data corresponding to the idx'th sample."""
-        data_t0 = torch.cat((self.predictors['ae_prob'][idx, :], 
-                             self.predictors['neut'][idx], 
-                             self.predictors['pinj'][idx]))
-        data_t1 = self.targets['ae_prob_delta'][idx, :]
+        """Fetch data corresponding to the idx'th sample.
+        
+        Returns
+        -------
+        data_t0 - tensor 
+                  Concatenated predictors. dim0: sample, dim1: feature
+        data_t1 - tensor
+                  Concatenated targets. dim0: sample, dim1: feature
+
+        """
+        data_t0 = torch.cat([v.data[idx, :] for v in self.predictors.values()], dim=-1)
+        data_t1 = torch.cat([t.data[idx, :] for t in self.targets.values()], dim=-1)
 
         return data_t0, data_t1
 #
