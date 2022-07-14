@@ -40,7 +40,7 @@ class signal_2d(signal_1d):
 
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_profile.h5")) 
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_{self.file_label}.h5")) 
         tb = torch.tensor(fp[self.key]["xdata"][:]) # Get time-base
         
         t0_idx, shift_smp, num_samples, nth_sample = self._get_time_sampling(tb)
@@ -63,6 +63,7 @@ class signal_dens(signal_2d):
     def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
         self.key = "edensfit"
+        self.file_label = "profiles"
         self.name = "dens"
 
 
@@ -73,6 +74,7 @@ class signal_temp(signal_2d):
     def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
         self.key = "etempfit"
+        self.file_label = "profiles"
         self.name = "temp"
 
 
@@ -83,6 +85,7 @@ class signal_pres(signal_2d):
     def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
         self.key = "pres"
+        self.file_label = "profiles"
         self.name = "pres"
     
     
@@ -93,6 +96,7 @@ class signal_q(signal_2d):
     def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
         self.key = "q"
+        self.file_label = "profiles"
         self.name = "q"
     
 
@@ -103,10 +107,11 @@ class signal_q95(signal_2d):
     def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
         self.key = "q95"
+        self.file_label = "profiles"
         self.name = "q95"
 
 
-class signal_ae_prob(signal_1d):
+class signal_ae_prob(signal_2d):
     """Probability for a given Alfven Eigenmode."""
     def __init__(self, shotnr, tstart, tend, tsample, 
             tshift=0.0, override_dt=None, 
@@ -205,7 +210,7 @@ class signal_ae_prob(signal_1d):
         return torch.tensor(ae_probs)
 
 
-class signal_ae_prob_delta(signal_1d):
+class signal_ae_prob_delta(signal_2d):
     """Change in Alfven Eigenmode probability over time""" 
     def __init__(self, shotnr, tstart, tend, tsample, 
             tshift=0.0, override_dt=None, 
@@ -257,6 +262,22 @@ class signal_ae_prob_delta(signal_1d):
         self.data_std = self.data.std()
         self.data = (self.data - self.data_mean) / self.data_std
         logging.info(f"Compiled signal data for shot {shotnr}, mean={self.data_mean}, std={self.data_std}")
+
+
+class signal_tri_l(signal_2d):
+    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+        self.key = "triangularity_l"
+        self.file_label = "shape"
+        self.name = "lower triangularity"
+        
+
+class signal_tri_u(signal_2d):
+    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+        self.key = "triangularity_u"
+        self.file_label = "shape"
+        self.name = "upper triangularity"
 
 class signal_ece_spec(signal_2d):
     """_summary_
