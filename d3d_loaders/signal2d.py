@@ -60,8 +60,8 @@ class signal_dens(signal_2d):
     """_summary_
     
     """
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, t_params, datapath, device)
         self.key = "edensfit"
         self.file_label = "profiles"
         self.name = "dens"
@@ -71,8 +71,8 @@ class signal_temp(signal_2d):
     """_summary_
     
     """
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, t_params, datapath, device)
         self.key = "etempfit"
         self.file_label = "profiles"
         self.name = "temp"
@@ -82,8 +82,8 @@ class signal_pres(signal_2d):
     """_summary_
     
     """
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, t_params, datapath, device)
         self.key = "pres"
         self.file_label = "profiles"
         self.name = "pres"
@@ -93,8 +93,8 @@ class signal_q(signal_2d):
     """q profile - 2d signal
     
     """
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, t_params, datapath, device)
         self.key = "q"
         self.file_label = "profiles"
         self.name = "q"
@@ -104,8 +104,8 @@ class signal_q95(signal_2d):
     """q95 profile - 2d signal
     
     """
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, t_params, datapath, device)
         self.key = "q95"
         self.file_label = "profiles"
         self.name = "q95"
@@ -113,8 +113,7 @@ class signal_q95(signal_2d):
 
 class signal_ae_prob(signal_2d):
     """Probability for a given Alfven Eigenmode."""
-    def __init__(self, shotnr, tstart, tend, tsample, 
-            tshift=0.0, override_dt=None, 
+    def __init__(self, shotnr, t_params, 
             datapath="/projects/EKOLEMEN/aza_lenny_data1",
             device="cpu"):
         """Loads weights for RCN model and calls base class constructor.
@@ -145,7 +144,7 @@ class signal_ae_prob(signal_2d):
         self.n_res_l2 = self.infer_data['layer2']['w_in'].shape[0]
 
         # Call base class constructor to fetch and store data
-        signal_1d.__init__(self, shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device=device)
+        signal_1d.__init__(self, shotnr, t_params, datapath, device=device)
 
 
     def _cache_data(self):
@@ -158,7 +157,7 @@ class signal_ae_prob(signal_2d):
         Returns
         -------
         ae_probs : tensor
-                   Probability for presence of an Alfven Eigenmode. dim0: feature. dim1: sample
+                   Probability for presence of an Alfven Eigenmode. dim0: samples. dim1: features
         """
 
         # Find how many samples apart tsample is
@@ -212,8 +211,7 @@ class signal_ae_prob(signal_2d):
 
 class signal_ae_prob_delta(signal_2d):
     """Change in Alfven Eigenmode probability over time""" 
-    def __init__(self, shotnr, tstart, tend, tsample, 
-            tshift=0.0, override_dt=None, 
+    def __init__(self, shotnr, t_params,
             datapath="/projects/EKOLEMEN/aza_lenny_data1",
             device="cpu"):
         """Construct difference in AE probability using two signal_ae_prob.
@@ -243,18 +241,22 @@ class signal_ae_prob_delta(signal_2d):
         
         
         # Signal at t0
-        signal_t0 = signal_ae_prob(shotnr, tstart, tend, tsample, tshift=0.0, 
-                override_dt=override_dt, datapath=datapath, device=device)
+        signal_t0 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
         # Shifted signal
-        signal_t1 = signal_ae_prob(shotnr, tstart, tend, tsample, tshift, 
-                override_dt, datapath, device=device)
+        signal_t1 = signal_ae_prob(shotnr, t_params, datapath, device=device)
     
         self.shotnr = shotnr
-        self.tstart = tstart
-        self.tend = tend
-        self.tsample = tsample
-        self.tshift = tshift
-        self.override_dt = override_dt
+        self.tstart = t_params["tstart"]
+        self.tend = t_params["tend"]
+        self.tsample = t_params["tsample"]
+        if "tshift" in list(t_params.keys()):
+            self.tshift = t_params["tshift"]
+        else:
+            self.tshift = 0.0
+        if "override_dt" in list(t_params.keys()):
+            self.override_dt = t_params["override_dt"]
+        else:
+            self.override_dt = None
         self.datapath = datapath
 
         self.data = ((signal_t1.data * signal_t1.data_std) + signal_t1.data_mean) - ((signal_t0.data * signal_t0.data_std) + signal_t0.data_mean) 
@@ -265,16 +267,16 @@ class signal_ae_prob_delta(signal_2d):
 
 
 class signal_tri_l(signal_2d):
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, t_params, datapath, device)
         self.key = "triangularity_l"
         self.file_label = "shape"
         self.name = "lower triangularity"
         
 
 class signal_tri_u(signal_2d):
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, t_params, datapath, device)
         self.key = "triangularity_u"
         self.file_label = "shape"
         self.name = "upper triangularity"
@@ -288,14 +290,14 @@ class signal_ece(signal_2d):
     ece_data : tensor
                 Data time series for profiles. dim0: ECE channels. dim1: samples
     """
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, 
+    def __init__(self, shotnr, t_params, 
                  datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu",
                  channels=range(1,41)):
         """
         Unique part of constructor is channels. Can be any list of numbers from 1-40, or 
         just an individual channel. 
         """
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+        super().__init__(shotnr, t_params, datapath, device)
         self.channels = channels
         
     def _cache_data(self):
@@ -307,7 +309,7 @@ class signal_ece(signal_2d):
         Returns
         -------
         prof_data : tensor
-                    Data time series for profiles. dim0: profile length. dim1: samples
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
         """
 
         t0_p = time.time()
@@ -321,7 +323,9 @@ class signal_ece(signal_2d):
 
         # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
         prof_data = torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"]
-                                           [t0_idx + shift_smp:t0_idx + shift_smp + num_samples:nth_sample,:] for channel in self.channels]))
+                                           [t0_idx + shift_smp:t0_idx + shift_smp + num_samples:nth_sample] for channel in self.channels],
+                                          axis=1)
+                                 )
         fp.close()
 
         elapsed = time.time() - t0_p

@@ -19,7 +19,7 @@ class D3D_dataset(torch.utils.data.Dataset):
     
     https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset
     """
-    def __init__(self, shotnr, tstart, tend, tsample, shift_target=10, 
+    def __init__(self, shotnr, t_params, shift_target=10, 
                  predictors=["pinj", "neutrons", "q95_prof"],
                  targets=["ae_prob_delta"],
                  datapath="/projects/EKOLEMEN/aza_lenny_data1",
@@ -30,12 +30,16 @@ class D3D_dataset(torch.utils.data.Dataset):
         ----------
         shotnr : int
                  shot number
-        tstart : float
-                 Start time, in milliseconds
-        tend : float
-               End time, in milliseconds
-        tsample : float
-                  Time between samples, in milliseconds
+
+        t_params : dict
+                   Must contain the following keys:
+        
+                        tstart : float
+                                Start time, in milliseconds
+                        tend : float
+                            End time, in milliseconds
+                        tsample : float
+                                Time between samples, in milliseconds
         shift_target : dict
                        Keys have to match names of the predictors or targets.
                        Values define an offset that is added to the signals timebase.
@@ -59,54 +63,58 @@ class D3D_dataset(torch.utils.data.Dataset):
         super(D3D_dataset).__init__()
         self.datapath = datapath
         self.shotnr = shotnr
-        self.tstart = tstart
-        self.tend = tend
-        self.tsample = tsample 
+        self.tstart = t_params["tstart"]
+        self.tend = t_params["tend"]
+        self.tsample = t_params["tsample "]
         self.shift_target = shift_target
 
         logging.info(f"Using device {device}")
 
-        assert(tstart < tend)
-        assert((tend - tstart) > tsample)
+        assert(self.tstart < self.tend)
+        assert((self.tend - self.tstart) > self.tsample)
         self.predictors = {}
         self.targets = {}
 
         # Initialize all predictors
         for pred_name in predictors:
             if pred_name == "pinj":
+                t_params_pinj = t_params.copy()
                 try:
-                    t_shift = self.shift_target[pred_name]
+                    t_params_pinj["t_shift"] = self.shift_target[pred_name]
                 except:
-                    t_shift = 0.0
+                    t_params_pinj["t_shift"] = 0.0
+                t_params_pinj["override_dt"] = 0.01
                 logging.info("Adding pinj to predictor list: {shotnr} t = {tstart}-{tend}ms, tsample={tsample}ms, t_shift={t_shift}")
-                self.predictors["pinj"] = signal_pinj(shotnr, tstart, tend, tsample, t_shift,
-                                                      override_dt=0.01, device=device)
+                self.predictors["pinj"] = signal_pinj(shotnr, t_params_pinj, device=device)
             if pred_name == "ae_prob":
+                t_params_ae_prob = t_params.copy()
                 try:
-                    t_shift = self.shift_target[pred_name]
+                    t_params_ae_prob["t_shift"] = self.shift_target[pred_name]
                 except:
-                    t_shift = 0.0
+                    t_params_ae_prob["t_shift"] = 0.0
+                t_params_ae_prob["override_dt"] = 2e-3
                 logging.info("Adding ae_prob to predictor list: {shotnr} t = {tstart}-{tend}ms, tsample={tsample}ms, t_shift={t_shift}")
-                self.predictors["ae_prob"] = signal_ae_prob(shotnr, tstart, tend, tsample, t_shift,
-                                                            override_dt=2e-3, device=device)
+                self.predictors["ae_prob"] = signal_ae_prob(shotnr, t_params_ae_prob, device=device)
             if pred_name == "neut":
+                t_params_neut = t_params.copy()
                 try:
-                    t_shift = self.shift_target[pred_name]
+                    t_params_neut["t_shift"] = self.shift_target[pred_name]
                 except:
-                    t_shift = 0.0       
+                    t_params_neut["t_shift"] = 0.0      
+                t_params_neut["override_dt"] = 2e-2 
                 logging.info("Adding neutron rate to predictor list: {shotnr} t = {tstart}-{tend}ms, tsample={tsample}ms, t_shift={t_shift}")         
-                self.predictors["neut"] = signal_neut(shotnr, tstart, tend, tsample, t_shift,
-                                                      override_dt=2e-2, device=device)
+                self.predictors["neut"] = signal_neut(shotnr, t_params_neut, device=device)
 
 
         for target_name in targets:
             if target_name == "ae_prob_delta":
+                t_params_ae_prob_delta = t_params.copy()
                 try:
-                    t_shift = self.shift_target[target_name]
+                    t_params_ae_prob_delta["t_shift"] = self.shift_target[target_name]
                 except:
-                    t_shift = 0.0  
+                    t_params_ae_prob_delta["t_shift"] = 0.0 
                 logging.info("Adding ae_prob_delta to target list: {shotnr} t = {tstart}-{tend}ms, tsample={tsample}ms, t_shift={t_shift}")              
-                self.targets["ae_prob_delta"] = signal_ae_prob_delta(shotnr, tstart, tend, tsample, t_shift,
+                self.targets["ae_prob_delta"] = signal_ae_prob_delta(shotnr, t_params_ae_prob_delta,
                                                                      device=device)
 
         # Assert that all data has the same number of samples

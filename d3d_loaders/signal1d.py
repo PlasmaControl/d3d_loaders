@@ -22,8 +22,7 @@ class signal_1d():
 
 
     """
-    def __init__(self, shotnr, tstart, tend, tsample, 
-            tshift=0.0, override_dt=None, 
+    def __init__(self, shotnr, t_params, 
             datapath="/projects/EKOLEMEN/aza_lenny_data1",
             device="cpu"):
         """Load data from HDF5 file, standardize, and move to device.
@@ -32,16 +31,24 @@ class signal_1d():
         ----------
         shotnr : Int
                  Shot number
-        tstart : float
-                 Start of signal interval, in milliseconds
-        tend : float
-               End of signal interval, in milliseconds
-        tsample : float
-                  Desired sampling time, in milliseconds
-        tshift : float, default=0.0
-                 Shift signal by tshift with respect to tstart, in milliseconds
-        override_dt : float, optional
-                      Use this value as sample spacing instead of calculating from xdata field in HDF5 file
+
+        t_params : dict
+                   Contains the following necessary keys:
+                 
+                        tstart : float
+                                    Start of signal interval, in milliseconds
+                        tend : float
+                                End of signal interval, in milliseconds
+                        tsample : float
+                                    Desired sampling time, in milliseconds
+                                    
+                   Optional keys/arguments:
+                   
+                        tshift : float, default=0.0
+                                Shift signal by tshift with respect to tstart, in milliseconds
+                        override_dt : float, optional
+                                    Use this value as sample spacing instead of calculating from xdata field in HDF5 file
+                                    
         datapath : string, default='/projects/EKOLEMEN/aza_lenny_data1'
                    Basepath where HDF5 data is stored.  
         device : string, default='cpu'
@@ -49,11 +56,17 @@ class signal_1d():
         """
         # Store function arguments as member variables
         self.shotnr = shotnr
-        self.tstart = tstart
-        self.tend = tend
-        self.tsample = tsample
-        self.tshift = tshift
-        self.override_dt = override_dt
+        self.tstart = t_params["tstart"]
+        self.tend = t_params["tend"]
+        self.tsample = t_params["tsample"]
+        if "tshift" in list(t_params.keys()):
+            self.tshift = t_params["tshift"]
+        else:
+            self.tshift = 0.0
+        if "override_dt" in list(t_params.keys()):
+            self.override_dt = t_params["override_dt"]
+        else:
+            self.override_dt = None
         self.datapath = datapath
         
         # Load data from HDF5 file and store, move to device
@@ -120,7 +133,7 @@ class signal_1d():
         Returns
         -------
         data : tensor
-                        Data time series of diagnostic. dim0: features. dim1: samples
+                        Data time series of diagnostic. dim0: samples. dim1: features
         """
         # Load neutron data at t0 and t0 + 50ms. dt for this data is 50ms
         t0_p = time.time()
@@ -156,7 +169,7 @@ class signal_pinj(signal_1d):
         Returns
         -------
         pinj_data : tensor
-                    Data time series of sum over all Pinj nodes. dim0: features. dim1: samples
+                    Data time series of sum over all Pinj nodes. dim0: samples. dim1: features
         """
 
         t0_p = time.time()
@@ -177,8 +190,8 @@ class signal_pinj(signal_1d):
 
 class signal_neut(signal_1d):
     "Neutrons rate 1d signal"
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, t_params, datapath, device)
         self.key = "neutronsrate"
         self.file_label = "profiles"
         self.name = "neutron"
@@ -186,8 +199,8 @@ class signal_neut(signal_1d):
 
 class signal_ip(signal_1d):
     "ip 1d signal"
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, t_params, datapath, device)
         self.key = "ip"
         self.file_label = "profiles"
         self.name = "ip"
@@ -195,8 +208,8 @@ class signal_ip(signal_1d):
     
 class signal_ech(signal_1d):
     "ECH 1d signal. Uses the corrected echpwrc pointname"
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, t_params, datapath, device)
         self.key = "echpwrc"
         self.file_label = "ech"
         self.name = "ECH"
@@ -204,8 +217,8 @@ class signal_ech(signal_1d):
     
 class signal_kappa(signal_1d):
     "Shape 1d signal Kappa"
-    def __init__(self, shotnr, tstart, tend, tsample, tshift=0, override_dt=None, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, tstart, tend, tsample, tshift, override_dt, datapath, device)
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        super().__init__(shotnr, t_params, datapath, device)
         self.key = "kappa"
         self.file_label = "shape"
         self.name = "kappa"

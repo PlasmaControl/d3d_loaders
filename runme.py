@@ -4,16 +4,22 @@ import sys
 sys.path.append("/home/rkube/repos/d3d_loaders")
 
 import torch
+from torch import nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+import numpy as np
 
 import logging
 from d3d_loaders.d3d_loaders import D3D_dataset
 
 # Consider 4 seconds of shot 170716
 shotnr = 170716
-t0 = 0.001
-t1 = 4000.0
+
+t_params = {
+    "tstart" : 0.001,
+    "tend"   : 4000.0,
+    "tsample": 1.0   
+}
 
 batch_size = 64
 num_epochs = 200
@@ -24,7 +30,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # * pinj, neutrons, Alfven Eigenmode probability as predictors
 # * Change in Alfven probability over 10 ms as target
 # * Data will be loaded from HDF5 files and moved to the device
-ds = D3D_dataset(shotnr, t0, t1, 1.0, 
+ds = D3D_dataset(shotnr, t_params, 
         predictors=["pinj", "neut", "ae_prob"],
         targets=["ae_prob_delta"],
         shift_target=10.0,

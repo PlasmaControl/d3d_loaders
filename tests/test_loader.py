@@ -20,8 +20,13 @@ sys.path.append("/home/rkube/repos/d3d_loaders")
 #from d3d_loaders.compile_dframes import process_df_bill
 from d3d_loaders.d3d_loaders import D3D_dataset
 
+t_params = {
+    "tstart" : 0.001,
+    "tend"   : 4000.0,
+    "tsample": 1.0   
+}
 
-my_ds = D3D_dataset(169113, 0.0, 4000.0, 1)
+my_ds = D3D_dataset(169113, t_params)
 
 # Plot the normalized Alfven eigenmode probabilities
 plt.figure()
