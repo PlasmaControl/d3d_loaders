@@ -100,17 +100,6 @@ class signal_q(signal_2d):
         self.file_label = "profiles"
         self.name = "q"
         super().__init__(shotnr, t_params, datapath, device)
-    
-
-class signal_q95(signal_2d):
-    """q95 profile - 2d signal
-    
-    """
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        self.key = "q95"
-        self.file_label = "profiles"
-        self.name = "q95"
-        super().__init__(shotnr, t_params, datapath, device)
 
 
 class signal_ae_prob(signal_2d):
