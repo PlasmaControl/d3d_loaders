@@ -6,7 +6,8 @@ Implements an iterable dataset for the HDF5 data stored in
 """
 
 import torch
-from d3d_loaders.signal1d import signal_pinj, signal_ae_prob, signal_neut, signal_ae_prob_delta
+from d3d_loaders.signal1d import signal_pinj, signal_neut
+from d3d_loaders.signal2d import signal_ae_prob, signal_ae_prob_delta
 
 import logging
 
@@ -65,7 +66,7 @@ class D3D_dataset(torch.utils.data.Dataset):
         self.shotnr = shotnr
         self.tstart = t_params["tstart"]
         self.tend = t_params["tend"]
-        self.tsample = t_params["tsample "]
+        self.tsample = t_params["tsample"]
         self.shift_target = shift_target
 
         logging.info(f"Using device {device}")

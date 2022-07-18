@@ -12,8 +12,10 @@ import h5py
 import torch
 
 import logging
-from signal1d import signal_1d
+import sys
+sys.path.append("..")
 
+from d3d_loaders.signal1d import signal_1d
 from d3d_loaders.rcn_functions import rcn_infer
 
 
