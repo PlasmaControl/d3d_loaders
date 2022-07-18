@@ -48,6 +48,7 @@ class signal_1d():
                                 Shift signal by tshift with respect to tstart, in milliseconds
                         override_dt : float, optional
                                     Use this value as sample spacing instead of calculating from xdata field in HDF5 file
+                                    NOTE: Necessary for all signals to align
                                     
         datapath : string, default='/projects/EKOLEMEN/aza_lenny_data1'
                    Basepath where HDF5 data is stored.  
@@ -63,7 +64,7 @@ class signal_1d():
             self.tshift = t_params["tshift"]
         else:
             self.tshift = 0.0
-        if "override_dt" in list(t_params.keys()):
+        if "override_dt" in list(t_params.keys()): # override_dt required if aligned data is wanted
             self.override_dt = t_params["override_dt"]
         else:
             self.override_dt = None
@@ -110,20 +111,53 @@ class signal_1d():
 
     def _get_time_sampling(self, tb):
         """
-        Use the time base to calculate the variables for indexing 2d signal
+        Use the time base to calculate the closest indices to desired dt (override_dt).
+        override_dt must be given or different signals will not align.
         
-        NOTE: This will be changed or moved since time sampling needs to be refined
+        Parameters
+        ----------
+        tb : float array
+                time base array, the time of each measurement
+        override_dt : float
+                desired time sampling frequency (passed in and set through t_params)
+        
+        Returns
+        -------
+        t_inds: int array
+                    Index of closest measurement to desired time
+                    (desired time is a ceiling so no data from future)
         """
+        # Checks for no override_dt, if this is not set, data will not align
         if self.override_dt is None:
             self.dt = np.diff(tb).mean()          # Get sampling time
-        else:
-            self.dt = self.override_dt
-        # Get total number of samples and desired sub-sample spacing
-        num_samples, nth_sample = self._get_num_n_samples(self.dt) # Number of samples and sample spacing
-        shift_smp = int(ceil(self.tshift/ self.dt))                # Shift samples by this number into the fuiture
-        t0_idx = torch.argmin(torch.abs(tb - self.tstart))
+            
+            # Get total number of samples and desired sub-sample spacing
+            num_samples, nth_sample = self._get_num_n_samples(self.dt) # Number of samples and sample spacing
+            shift_smp = int(ceil(self.tshift/ self.dt))                # Shift samples by this number into the fuiture
+            t0_idx = torch.argmin(torch.abs(tb - self.tstart))
+            
+            t_inds = np.arange(t0_idx + shift_smp, t0_idx + shift_smp + num_samples, nth_sample)
+            return t_inds
+        
+        # Uses override_dt to find closest time value
+        self.dt = self.override_dt
+        
+        # Forced sampling times
+        time_samp_vals = np.arange(self.tstart, self.tend, self.override_dt)
+        
+        tb_ind = 1 # Index of time in tb
+        num_samples = len(time_samp_vals)
+        t_inds = np.zeros((num_samples,))
+        
+        for i, time_samp in enumerate(time_samp_vals):
+            # Increase tb_ind until the real time is past our sampling time
+            while tb[tb_ind] < time_samp and tb_ind < len(tb):
+                tb_ind += 1
+            
+            # Save last index where tb[tb_ind] < time_samp
+            t_inds[i] = tb_ind - 1
 
-        return t0_idx, shift_smp, num_samples, nth_sample
+        return t_inds
 
     def _cache_data(self):
         """Default reader to cache data from hdf5 file. 
@@ -141,9 +175,9 @@ class signal_1d():
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_{self.file_label}.h5")) 
         tb = torch.tensor(fp[self.key]["xdata"][:])
 
-        t0_idx, shift_smp, num_samples, nth_sample = self._get_time_sampling(tb)
+        t_inds = self._get_time_sampling(tb)
 
-        data = torch.tensor(fp[self.key]["zdata"][t0_idx + shift_smp:t0_idx + shift_smp + num_samples:nth_sample])
+        data = torch.tensor(fp[self.key]["zdata"][t_inds])
         fp.close()    
 
         elapsed = time.time() - t0_p       
@@ -177,9 +211,9 @@ class signal_pinj(signal_1d):
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_pinj.h5")) 
         tb = torch.tensor(fp["pinjf_15l"]["xdata"][:]) # Get time-base
 
-        t0_idx, shift_smp, num_samples, nth_sample = self._get_time_sampling(tb)
+        t_inds = self._get_time_sampling(tb)
 
-        pinj_data = sum([torch.tensor(fp[k]["zdata"][:])[t0_idx + shift_smp:t0_idx + shift_smp + num_samples:nth_sample] for k in fp.keys()])
+        pinj_data = sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in fp.keys()])
         fp.close()
 
         elapsed = time.time() - t0_p

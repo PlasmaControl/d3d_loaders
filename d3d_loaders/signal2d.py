@@ -45,11 +45,9 @@ class signal_2d(signal_1d):
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_{self.file_label}.h5")) 
         tb = torch.tensor(fp[self.key]["xdata"][:]) # Get time-base
         
-        t0_idx, shift_smp, num_samples, nth_sample = self._get_time_sampling(tb)
-        
-        logging.info(f"Sampling {self.name}: t0_idx={t0_idx}, dt={self.dt}, num_samples={num_samples}, nth_sample={nth_sample}")
+        t_inds = self._get_time_sampling(tb)
 
-        prof_data = torch.tensor(fp[self.key]["zdata"][:])[t0_idx + shift_smp:t0_idx + shift_smp + num_samples:nth_sample,:]
+        prof_data = torch.tensor(fp[self.key]["zdata"][:])[t_inds,:]
         fp.close()
 
         elapsed = time.time() - t0_p
@@ -309,13 +307,11 @@ class signal_ece(signal_2d):
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_ece.h5")) 
         tb = torch.tensor(fp['ece']["xdata"][:]) # Get time-base
         
-        t0_idx, shift_smp, num_samples, nth_sample = self._get_time_sampling(tb)
-        
-        logging.info(f"Sampling {self.name}: t0_idx={t0_idx}, dt={self.dt}, num_samples={num_samples}, nth_sample={nth_sample}")
+        t_inds = self._get_time_sampling(tb)
 
         # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
         prof_data = torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"]
-                                           [t0_idx + shift_smp:t0_idx + shift_smp + num_samples:nth_sample] for channel in self.channels],
+                                           [t_inds] for channel in self.channels],
                                           axis=1)
                                  )
         fp.close()
