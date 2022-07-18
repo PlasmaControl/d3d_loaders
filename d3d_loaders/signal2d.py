@@ -37,7 +37,7 @@ class signal_2d(signal_1d):
         Returns
         -------
         prof_data : tensor
-                    Data time series for profiles. dim0: profile length. dim1: samples
+                    Data time series for profiles. dim0: samples dim1: profile length
         """
 
         t0_p = time.time()
@@ -49,9 +49,9 @@ class signal_2d(signal_1d):
             
             t_inds = self._get_time_sampling(tb)
             if prof_data == None:
-                prof_data = torch.tensor(fp[self.key]["zdata"][:])[t_inds,:]
+                prof_data = torch.tensor(fp[self.key]["zdata"][:])[t_inds,:].T
             else:
-                prof_data = torch.cat((prof_data, torch.tensor(fp[self.key]["zdata"][:])[t_inds,:]), 0)
+                prof_data = torch.cat((prof_data, (torch.tensor(fp[self.key]["zdata"][:]).T)[t_inds,:]), 0)
             fp.close()
 
         elapsed = time.time() - t0_p
