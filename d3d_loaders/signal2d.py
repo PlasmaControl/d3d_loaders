@@ -61,10 +61,10 @@ class signal_dens(signal_2d):
     
     """
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, t_params, datapath, device)
         self.key = "edensfit"
         self.file_label = "profiles"
         self.name = "dens"
+        super().__init__(shotnr, t_params, datapath, device)
 
 
 class signal_temp(signal_2d):
@@ -72,10 +72,10 @@ class signal_temp(signal_2d):
     
     """
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, t_params, datapath, device)
         self.key = "etempfit"
         self.file_label = "profiles"
         self.name = "temp"
+        super().__init__(shotnr, t_params, datapath, device)
 
 
 class signal_pres(signal_2d):
@@ -83,10 +83,10 @@ class signal_pres(signal_2d):
     
     """
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, t_params, datapath, device)
         self.key = "pres"
         self.file_label = "profiles"
         self.name = "pres"
+        super().__init__(shotnr, t_params, datapath, device)
     
     
 class signal_q(signal_2d):
@@ -94,10 +94,10 @@ class signal_q(signal_2d):
     
     """
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, t_params, datapath, device)
         self.key = "q"
         self.file_label = "profiles"
         self.name = "q"
+        super().__init__(shotnr, t_params, datapath, device)
     
 
 class signal_q95(signal_2d):
@@ -105,10 +105,10 @@ class signal_q95(signal_2d):
     
     """
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, t_params, datapath, device)
         self.key = "q95"
         self.file_label = "profiles"
         self.name = "q95"
+        super().__init__(shotnr, t_params, datapath, device)
 
 
 class signal_ae_prob(signal_2d):
@@ -268,18 +268,18 @@ class signal_ae_prob_delta(signal_2d):
 
 class signal_tri_l(signal_2d):
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, t_params, datapath, device)
         self.key = "triangularity_l"
         self.file_label = "shape"
         self.name = "lower triangularity"
+        super().__init__(shotnr, t_params, datapath, device)
         
 
 class signal_tri_u(signal_2d):
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, t_params, datapath, device)
         self.key = "triangularity_u"
         self.file_label = "shape"
         self.name = "upper triangularity"
+        super().__init__(shotnr, t_params, datapath, device)
 
 
 class signal_ece(signal_2d):
@@ -297,8 +297,8 @@ class signal_ece(signal_2d):
         Unique part of constructor is channels. Can be any list of numbers from 1-40, or 
         just an individual channel. 
         """
-        super().__init__(shotnr, t_params, datapath, device)
         self.channels = channels
+        super().__init__(shotnr, t_params, datapath, device)
         
     def _cache_data(self):
         """Load 2d profile from hdf5 data file.

@@ -191,34 +191,34 @@ class signal_pinj(signal_1d):
 class signal_neut(signal_1d):
     "Neutrons rate 1d signal"
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, t_params, datapath, device)
         self.key = "neutronsrate"
         self.file_label = "profiles"
         self.name = "neutron"
+        super().__init__(shotnr, t_params, datapath, device)
 
 
 class signal_ip(signal_1d):
     "ip 1d signal"
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, t_params, datapath, device)
         self.key = "ip"
         self.file_label = "profiles"
         self.name = "ip"
+        super().__init__(shotnr, t_params, datapath, device)
    
     
 class signal_ech(signal_1d):
     "ECH 1d signal. Uses the corrected echpwrc pointname"
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, t_params, datapath, device)
         self.key = "echpwrc"
         self.file_label = "ech"
         self.name = "ECH"
+        super().__init__(shotnr, t_params, datapath, device)
     
     
 class signal_kappa(signal_1d):
     "Shape 1d signal Kappa"
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        super().__init__(shotnr, t_params, datapath, device)
         self.key = "kappa"
         self.file_label = "shape"
         self.name = "kappa"
+        super().__init__(shotnr, t_params, datapath, device)
