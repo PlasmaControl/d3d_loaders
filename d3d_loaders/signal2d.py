@@ -49,7 +49,7 @@ class signal_2d(signal_1d):
             
             t_inds = self._get_time_sampling(tb)
             if prof_data == None:
-                prof_data = torch.tensor(fp[self.key]["zdata"][:])[t_inds,:].T
+                prof_data = (torch.tensor(fp[self.key]["zdata"][:]).T)[t_inds,:]
             else:
                 prof_data = torch.cat((prof_data, (torch.tensor(fp[self.key]["zdata"][:]).T)[t_inds,:]), 0)
             fp.close()
@@ -128,6 +128,7 @@ class signal_ae_prob(signal_2d):
         device : string, default='cpu'
                  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         """
+        self.name = 'ae_prob'
         # The RCN model weights are needed to call the base-class constructor
         with open('/home/rkube/ml4control/1dsignal-model-AE-ECE-RCN.pkl', 'rb') as df:
             self.infer_data = pickle.load(df)
@@ -162,10 +163,10 @@ class signal_ae_prob(signal_2d):
             t_inds = self._get_time_sampling(tb)
 
             # Read in all ece_data at t0 and shifted at t0 + 50 mus
-            if ece_data == None:
+            if type(ece_data) == type(None):
                 ece_data = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t_inds] for i in range(40)]).T
             else:
-                ece_data = torch.cat((ece_data, np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t_inds] for i in range(40)]).T), 0)
+                ece_data = np.append(ece_data, np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t_inds] for i in range(40)]).T, 0)
             fp.close()
             # After this we have ece_data_0.shape = (num_samples / nth_sample, 40)
 
@@ -225,7 +226,7 @@ class signal_ae_prob_delta(signal_2d):
         Constructs a the change in Alfven Eigenmode probability using a finite difference method.
         The signals are separated by t_shift.
         """
-        
+        self.name = 'ae_prob_delta'
         
         # Signal at t0
         signal_t0 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
@@ -282,6 +283,7 @@ class signal_ece(signal_2d):
         just an individual channel. 
         """
         self.channels = channels
+        self.name = 'raw ece'
         super().__init__(shotnr, t_params, datapath, device)
         
     def _cache_data(self):

@@ -12,21 +12,46 @@ Examples
 Import and instantiate the loader like this:
 ```python
 from d3d_loaders.d3d_loaders import D3D_dataset
-my_ds = D3D_dataset(shotnr, tstart, tend, tsample,
+t_params = {'tstart' : tstart,
+            'tend'   : tend,
+            'tsample': tsample
+}
+shift_targets = {'ae_prob_delta':10.0}
+
+my_ds = D3D_dataset(shotnr, t_params,
                     predictors=["pinj", "neut", "ae_prob"],
                     targets=["ae_prob_delta"],
-                    shift_target=10.0,
+                    shift_targets=shift_targets,
                     device=device)
 ```
 
-Here `shotnr` gives a shot to work on, `tstart` and `tend` define a time interval for the
+Here `shotnr` gives the shots to work on, `tstart` and `tend` define a time interval for the
 signals, and `tsample` defines the common sampling time for all signals.
 `predictors` defines a list of signals that are used to predict the `target`.
+`shift_targets` is the amount each time signal should be shifted, except for `ae_prob_delta` 
+where it is the interval we are looking into the future to calculate our change in probability. 
 They will be stored in the dictionaries `my_ds.predictors` and `my_ds.target`
 respectively. Each value of these dicts is a derived class of `signal_1d`.
 
-Currently the loader uses the Alfven Eigenmode probability, as output by Aza's RCN model,
-summed neutral power, and neutron rate as the data sources.
+Currently, the only target is `ae_prob_delta`, calculated using AE probabilities from Aza's RCN model. 
+The current predictors are:
+
+| Predictor             | Key     |
+|-----------------------|---------|
+| AE Mode probabilities | ae_prob |
+| Pinj                  | pinj    |
+| Neutron Rate          | neut    |
+| Injected Power        | ip      |
+| ECH                   | ech     |
+| q95                   | q95     |
+| kappa                 | kappa   |
+| Density Profile       | dens    |
+| Pressure Profile      | pres    |
+| Temperature Profile   | temp    |
+| q Profile             | q       |
+| Lower Triangularity   | tri_l   |
+| Upper Triangularity   | tri_u   |
+| Raw ECE Channels      | raw_ece |
 
 At a given index, the output is a list of 2 tensors.
 ```
@@ -37,11 +62,12 @@ Out[119]:
  tensor([-0.0207, -0.0328, -0.0478, -0.0331, -0.0119]))
 ```
 
-The first tensor has 7 elements. The first 5 are the probabilities for a given Alfven
-Eigenmode, element 6 gives the neutron rate, and element 7 encodes summed pinj.
-Each of these three groups is normalized to their separate mean and standard deviation.
-The output is the change in the Alfven Eigenmode probabilities over a 50 microsecond interval,
-i.e. AE mode probability at t0 + 50mus as calculated using ECE data. This output is also
+The first tensor has a number of elements fixed by the number of signals being used. 
+The order will match the order of the signals in `predictors`. 
+Each of these signals is normalized to their separate mean and standard deviation.
+The output tensor (2nd tensor) is the change in the Alfven Eigenmode probabilities over the interval given in
+`shift_targets` with the `ae_prob_delta` key,
+i.e. AE mode probability at t0 + 10ms as calculated using ECE data. This output is also
 normalized to zero mean and unit standard deviation.
 
 

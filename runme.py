@@ -33,7 +33,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 ds = D3D_dataset(shotnr, t_params, 
         predictors=["pinj", "neut", "ae_prob"],
         targets=["ae_prob_delta"],
-        shift_target=10.0,
+        shift_targets={'ae_prob_delta':10.0},
         device=device)
 
 # Set up train/validation split

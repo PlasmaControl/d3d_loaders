@@ -20,10 +20,10 @@ class D3D_dataset(torch.utils.data.Dataset):
     
     https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset
     """
-    def __init__(self, shotnr, t_params,
-                 shift_targets={'ae_prob_delta':10.0}, 
+    def __init__(self, shotnr, t_params, 
                  predictors=["pinj", "neutrons", "q95_prof"],
                  targets=["ae_prob_delta"],
+                 shift_targets={'ae_prob_delta':10.0}, 
                  datapath="/projects/EKOLEMEN/aza_lenny_data1",
                  device="cpu"):
         """Initializes the dataloader for DIII-D data.
@@ -44,7 +44,9 @@ class D3D_dataset(torch.utils.data.Dataset):
                                 Time between samples, in milliseconds
         shift_targets : dict
                        Keys have to match names of the predictors or targets.
-                       Values define an offset that is added to the signals timebase.
+                       Values define an offset that is added to the signals timebase, except for
+                       ae_prob_delta where it is the amount we look into the future to calculate
+                       our change in probability.
         device : string
                  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -107,13 +109,11 @@ class D3D_dataset(torch.utils.data.Dataset):
             try:
                 t_shift = self.shift_target[target_name]
             except:
-                t_shift = 0.0 
-            t_params_key['t_shift'] = t_shift
+                t_shift = 10.0 
             
             if target_name == "ae_prob_delta":
                 logging.info(f"Adding ae_prob_delta to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              
-                self.targets["ae_prob_delta"] = signal_ae_prob_delta(shotnr, t_params_key,
-                                                                     device=device)
+                self.targets["ae_prob_delta"] = signal_ae_prob_delta(shotnr, t_params_key, t_shift, device=device)
             
             # Add other targets here
             

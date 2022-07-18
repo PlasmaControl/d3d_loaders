@@ -4,6 +4,7 @@
 
 from os.path import join
 from math import ceil
+from re import L
 import time
 
 import numpy as np
@@ -103,7 +104,8 @@ class signal_1d():
         t_inds = np.zeros((num_samples,), dtype=int)
         
         # Make sure our first sample is after first true measurement was taken
-        assert tb[0] < time_samp_vals[0]
+        if not tb[0] < time_samp_vals[0]:
+            raise(ValueError(f'Time of first sample is before first real measurement was taken for {self.name}'))
         
         for i, time_samp in enumerate(time_samp_vals):
             # Increase tb_ind until the real time is past our sampling time
@@ -159,6 +161,10 @@ class signal_1d():
 
 class signal_pinj(signal_1d):
     """Sum of total injected power."""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        self.name = 'pinj'
+        super().__init__(shotnr, t_params, datapath, device)
+    
     def _cache_data(self):
         """Load sum of all pinj from hdf5 data file.
         
@@ -167,7 +173,6 @@ class signal_pinj(signal_1d):
         pinj_data : tensor
                     Data time series of sum over all Pinj nodes. dim0: samples. dim1: features
         """
-
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         pinj_data = None
