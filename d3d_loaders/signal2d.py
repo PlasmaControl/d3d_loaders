@@ -135,7 +135,7 @@ class signal_ae_prob(signal_2d):
         self.n_res_l2 = self.infer_data['layer2']['w_in'].shape[0]
 
         # Call base class constructor to fetch and store data
-        super().__init__(self, shotnr, t_params, datapath, device=device)
+        super().__init__(self, shotnr, t_params, datapath=datapath, device=device)
 
 
     def _cache_data(self):
@@ -235,7 +235,7 @@ class signal_ae_prob_delta(signal_2d):
         signal_t0 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
         # Shifted signal
         t_params['tshift'] = tshift
-        signal_t1 = signal_ae_prob(shotnr, t_params, datapath, device=device)
+        signal_t1 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
     
         self.shotnr = shotnr
         self.tstart = t_params["tstart"]
