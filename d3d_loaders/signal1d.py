@@ -96,7 +96,7 @@ class signal_1d():
         
         tb_ind = 1 # Index of time in tb
         num_samples = len(time_samp_vals)
-        t_inds = np.zeros((num_samples,))
+        t_inds = np.zeros((num_samples,), dtype=int)
         
         for i, time_samp in enumerate(time_samp_vals):
             # Increase tb_ind until the real time is past our sampling time
