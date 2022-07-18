@@ -42,16 +42,20 @@ class signal_2d(signal_1d):
 
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_{self.file_label}.h5")) 
-        tb = torch.tensor(fp[self.key]["xdata"][:]) # Get time-base
-        
-        t_inds = self._get_time_sampling(tb)
-
-        prof_data = torch.tensor(fp[self.key]["zdata"][:])[t_inds,:]
-        fp.close()
+        prof_data = None
+        for shot in self.shotnr:
+            fp = h5py.File(join(self.datapath, "template", f"{shot}_{self.file_label}.h5")) 
+            tb = torch.tensor(fp[self.key]["xdata"][:]) # Get time-base
+            
+            t_inds = self._get_time_sampling(tb)
+            if prof_data == None:
+                prof_data = torch.tensor(fp[self.key]["zdata"][:])[t_inds,:]
+            else:
+                prof_data = np.append(prof_data, torch.tensor(fp[self.key]["zdata"][:])[t_inds,:], axis=0)
+            fp.close()
 
         elapsed = time.time() - t0_p
-        logging.info(f"Loading {self.name} for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
+        logging.info(f"Loading {self.name}, t={self.tstart}-{self.tend}s took {elapsed}s")
         
         return prof_data
 
@@ -302,7 +306,7 @@ class signal_ece(signal_2d):
         fp.close()
 
         elapsed = time.time() - t0_p
-        logging.info(f"Loading {self.name} for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
+        logging.info(f"Loading raw ECE, t={self.tstart}-{self.tend}s took {elapsed}s")
         
         # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
         return prof_data

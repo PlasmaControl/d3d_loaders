@@ -29,8 +29,8 @@ class signal_1d():
 
         Parameters
         ----------
-        shotnr : Int
-                 Shot number
+        shotnr : Array of ints or single int
+                 Shot numbers
 
         t_params : dict
                    Contains the following necessary keys:
@@ -51,6 +51,10 @@ class signal_1d():
         device : string, default='cpu'
                  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         """
+        # Turn shotnr to array if single int
+        if type(shotnr) == int:
+            shotnr = [shotnr]
+            
         # Store function arguments as member variables
         self.shotnr = shotnr
         self.tstart = t_params["tstart"]
@@ -68,7 +72,7 @@ class signal_1d():
         self.data_mean = self.data.mean()
         self.data_std = self.data.std()
         self.data = (self.data - self.data_mean) / self.data_std
-        logging.info(f"""Compiled signal {self.__class__.__name__} for shot {shotnr}, 
+        logging.info(f"""Compiled signal {self.__class__.__name__}, 
                          tstart={self.tstart}, tend={self.tend}, tsample={self.tsample}, tshift={self.tshift},
                          datapath={self.datapath}, 
                          mean={self.data_mean}, std={self.data_std}""")
@@ -98,9 +102,12 @@ class signal_1d():
         num_samples = len(time_samp_vals)
         t_inds = np.zeros((num_samples,), dtype=int)
         
+        # Make sure our first sample is after first true measurement was taken
+        assert tb[0] < time_samp_vals[0]
+        
         for i, time_samp in enumerate(time_samp_vals):
             # Increase tb_ind until the real time is past our sampling time
-            while tb[tb_ind] < time_samp and tb_ind < len(tb):
+            while tb[tb_ind] < time_samp and tb_ind < len(tb) - 1:
                 tb_ind += 1
             
             # Save last index where tb[tb_ind] < time_samp
@@ -121,13 +128,19 @@ class signal_1d():
         # Load neutron data at t0 and t0 + 50ms. dt for this data is 50ms
         t0_p = time.time()
         # Don't use with... scope. This throws off dataloader
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_{self.file_label}.h5")) 
-        tb = torch.tensor(fp[self.key]["xdata"][:])
+        data = None
+        for shot in self.shotnr:
+            fp = h5py.File(join(self.datapath, "template", f"{shot}_{self.file_label}.h5")) 
+            tb = torch.tensor(fp[self.key]["xdata"][:])
 
-        t_inds = self._get_time_sampling(tb)
-
-        data = torch.tensor(fp[self.key]["zdata"][t_inds])
-        fp.close()    
+            t_inds = self._get_time_sampling(tb)
+            
+            if data == None:
+                data = torch.tensor(fp[self.key]["zdata"][:])[t_inds]
+            else:
+                # Append new shot along samples axis (axis=0)
+                data = np.append(data, torch.tensor(fp[self.key]["zdata"][:])[t_inds], axis=0)
+            fp.close()
 
         elapsed = time.time() - t0_p       
         logging.info(f"Caching {self.name} data for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")

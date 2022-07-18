@@ -30,8 +30,8 @@ class D3D_dataset(torch.utils.data.Dataset):
 
         Parameters
         ----------
-        shotnr : int
-                 shot number
+        shotnr : array of ints
+                 shot numbers
 
         t_params : dict
                    Contains the following keys:
