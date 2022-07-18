@@ -43,12 +43,8 @@ class signal_1d():
                                     Desired sampling time, in milliseconds
                                     
                    Optional keys/arguments:
-                   
                         tshift : float, default=0.0
                                 Shift signal by tshift with respect to tstart, in milliseconds
-                        override_dt : float, optional
-                                    Use this value as sample spacing instead of calculating from xdata field in HDF5 file
-                                    NOTE: Necessary for all signals to align
                                     
         datapath : string, default='/projects/EKOLEMEN/aza_lenny_data1'
                    Basepath where HDF5 data is stored.  
@@ -60,14 +56,10 @@ class signal_1d():
         self.tstart = t_params["tstart"]
         self.tend = t_params["tend"]
         self.tsample = t_params["tsample"]
-        if "tshift" in list(t_params.keys()):
+        try:
             self.tshift = t_params["tshift"]
-        else:
+        except:
             self.tshift = 0.0
-        if "override_dt" in list(t_params.keys()): # override_dt required if aligned data is wanted
-            self.override_dt = t_params["override_dt"]
-        else:
-            self.override_dt = None
         self.datapath = datapath
         
         # Load data from HDF5 file and store, move to device
@@ -78,72 +70,29 @@ class signal_1d():
         self.data = (self.data - self.data_mean) / self.data_std
         logging.info(f"""Compiled signal {self.__class__.__name__} for shot {shotnr}, 
                          tstart={self.tstart}, tend={self.tend}, tsample={self.tsample}, tshift={self.tshift},
-                         override_dt={self.override_dt}, datapath={self.datapath}, 
+                         datapath={self.datapath}, 
                          mean={self.data_mean}, std={self.data_std}""")
-
-
-    def _get_num_n_samples(self, dt):
-        """Calculates number of samples and sample skipping.
-
-        This function is 
-
-        Given a signal sampled on [tstart:tend] with sample spacing dt
-        calculate the total number of samples available.
-
-        Also calculates the sample skipping when sub-sampling dt to self.tsample.
-
-        Parameters
-        ----------
-        dt : sampling time, in milliseconds
-
-        Returns
-        -------
-        num_samples : int
-                      Number of samples that cover the interval [tstart:tend]
-        nth_sample : int
-                     Number of samples that are skipped in the original time series 
-        """
-
-        num_samples = int(ceil((self.tend - self.tstart) / dt))
-        nth_sample = int(ceil(self.tsample / dt))
-
-        return num_samples, nth_sample
 
     def _get_time_sampling(self, tb):
         """
-        Use the time base to calculate the closest indices to desired dt (override_dt).
-        override_dt must be given or different signals will not align.
+        Use the time base to calculate the closest indices to desired tsample
         
         Parameters
         ----------
         tb : float array
-                time base array, the time of each measurement
-        override_dt : float
-                desired time sampling frequency (passed in and set through t_params)
+                time base array, the true time of each measurement
         
         Returns
         -------
         t_inds: int array
                     Index of closest measurement to desired time
                     (desired time is a ceiling so no data from future)
-        """
-        # Checks for no override_dt, if this is not set, data will not align
-        if self.override_dt is None:
-            self.dt = np.diff(tb).mean()          # Get sampling time
-            
-            # Get total number of samples and desired sub-sample spacing
-            num_samples, nth_sample = self._get_num_n_samples(self.dt) # Number of samples and sample spacing
-            shift_smp = int(ceil(self.tshift/ self.dt))                # Shift samples by this number into the fuiture
-            t0_idx = torch.argmin(torch.abs(tb - self.tstart))
-            
-            t_inds = np.arange(t0_idx + shift_smp, t0_idx + shift_smp + num_samples, nth_sample)
-            return t_inds
-        
-        # Uses override_dt to find closest time value
-        self.dt = self.override_dt
-        
+        """       
         # Forced sampling times
-        time_samp_vals = np.arange(self.tstart, self.tend, self.override_dt)
+        time_samp_vals = np.arange(self.tstart, self.tend, self.tsample)
+        
+        # Shift times
+        time_samp_vals += self.tshift
         
         tb_ind = 1 # Index of time in tb
         num_samples = len(time_samp_vals)

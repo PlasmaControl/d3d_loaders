@@ -119,8 +119,6 @@ class signal_ae_prob(signal_2d):
                   Desired sampling time, in milliseconds
         tshift : float, default=0.0
                  Shift signal by tshift with respect to tstart, in milliseconds
-        override_dt : float, optional
-                      Use this value as sample spacing instead of calculating from xdata field in HDF5 file
         datapath : string, default='/projects/EKOLEMEN/aza_lenny_data1'
                    Basepath where HDF5 data is stored.  
         device : string, default='cpu'
@@ -154,18 +152,11 @@ class signal_ae_prob(signal_2d):
         # Don't use scope. This throws off multi-threaded loaders
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_ece.h5"), "r") 
         tb = fp["ece"]["xdata"][:]    # Get ECE time-base
-
-        if self.override_dt is None:
-            self.dt = np.diff(tb).mean()
-        else:
-            self.dt = self.override_dt        
-        num_samples, nth_sample = self._get_num_n_samples(self.dt)
-        
-        shift_smp = int(ceil(self.tshift/ self.dt))
-        t0_idx = np.argmin(np.abs(tb - self.tstart))
+ 
+        t_inds = self._get_time_sampling(tb)
 
         # Read in all ece_data at t0 and shifted at t0 + 50 mus
-        ece_data = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t0_idx + shift_smp:t0_idx + shift_smp + num_samples:nth_sample ] for i in range(40)]).T
+        ece_data = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t_inds] for i in range(40)]).T
         fp.close()
         # After this we have ece_data_0.shape = (num_samples / nth_sample, 40)
 
@@ -217,8 +208,6 @@ class signal_ae_prob_delta(signal_2d):
                   Desired sampling time, in milliseconds
         tshift : float, default=0.0
                  Shift signal by tshift with respect to tstart, in milliseconds
-        override_dt : float, optional
-                      Use this value as sample spacing instead of calculating from xdata field in HDF5 file
         datapath : string, default='/projects/EKOLEMEN/aza_lenny_data1'
                    Basepath where HDF5 data is stored.  
         device : string, default='cpu'
@@ -243,10 +232,6 @@ class signal_ae_prob_delta(signal_2d):
             self.tshift = t_params["tshift"]
         else:
             self.tshift = 0.0
-        if "override_dt" in list(t_params.keys()):
-            self.override_dt = t_params["override_dt"]
-        else:
-            self.override_dt = None
         self.datapath = datapath
 
         self.data = ((signal_t1.data * signal_t1.data_std) + signal_t1.data_mean) - ((signal_t0.data * signal_t0.data_std) + signal_t0.data_mean) 
