@@ -139,7 +139,7 @@ class signal_1d():
                 data = torch.tensor(fp[self.key]["zdata"][:])[t_inds]
             else:
                 # Append new shot along samples axis (axis=0)
-                data = np.append(data, torch.tensor(fp[self.key]["zdata"][:])[t_inds], axis=0)
+                data = torch.cat((data, torch.tensor(fp[self.key]["zdata"][:])[t_inds]), 0)
             fp.close()
 
         elapsed = time.time() - t0_p       
@@ -170,13 +170,17 @@ class signal_pinj(signal_1d):
 
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_pinj.h5")) 
-        tb = torch.tensor(fp["pinjf_15l"]["xdata"][:]) # Get time-base
+        pinj_data = None
+        for shot in self.shotnr:
+            fp = h5py.File(join(self.datapath, "template", f"{shot}_pinj.h5")) 
+            tb = torch.tensor(fp["pinjf_15l"]["xdata"][:]) # Get time-base
 
-        t_inds = self._get_time_sampling(tb)
-
-        pinj_data = sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in fp.keys()])
-        fp.close()
+            t_inds = self._get_time_sampling(tb)
+            if pinj_data == None:
+                pinj_data = sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in fp.keys()])
+            else:
+                pinj_data = torch.cat((pinj_data, sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in fp.keys()])), 0)
+            fp.close()
 
         elapsed = time.time() - t0_p
         logging.info(f"Caching pinj data for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")

@@ -51,7 +51,7 @@ class signal_2d(signal_1d):
             if prof_data == None:
                 prof_data = torch.tensor(fp[self.key]["zdata"][:])[t_inds,:]
             else:
-                prof_data = np.append(prof_data, torch.tensor(fp[self.key]["zdata"][:])[t_inds,:], axis=0)
+                prof_data = torch.cat((prof_data, torch.tensor(fp[self.key]["zdata"][:])[t_inds,:]), 0)
             fp.close()
 
         elapsed = time.time() - t0_p
@@ -154,15 +154,20 @@ class signal_ae_prob(signal_2d):
         # Find how many samples apart tsample is
         t0_p = time.time()
         # Don't use scope. This throws off multi-threaded loaders
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_ece.h5"), "r") 
-        tb = fp["ece"]["xdata"][:]    # Get ECE time-base
- 
-        t_inds = self._get_time_sampling(tb)
+        ece_data = None
+        for shot in self.shotnr:
+            fp = h5py.File(join(self.datapath, "template", f"{shot}_ece.h5"), "r") 
+            tb = fp["ece"]["xdata"][:]    # Get ECE time-base
+    
+            t_inds = self._get_time_sampling(tb)
 
-        # Read in all ece_data at t0 and shifted at t0 + 50 mus
-        ece_data = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t_inds] for i in range(40)]).T
-        fp.close()
-        # After this we have ece_data_0.shape = (num_samples / nth_sample, 40)
+            # Read in all ece_data at t0 and shifted at t0 + 50 mus
+            if ece_data == None:
+                ece_data = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t_inds] for i in range(40)]).T
+            else:
+                ece_data = torch.cat((ece_data, np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t_inds] for i in range(40)]).T), 0)
+            fp.close()
+            # After this we have ece_data_0.shape = (num_samples / nth_sample, 40)
 
         # Pre-allocate array for AE mode probabilities
         # dim0: time index
@@ -293,17 +298,24 @@ class signal_ece(signal_2d):
 
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_ece.h5")) 
-        tb = torch.tensor(fp['ece']["xdata"][:]) # Get time-base
-        
-        t_inds = self._get_time_sampling(tb)
+        prof_data = None
+        for shot in self.shotnr:
+            fp = h5py.File(join(self.datapath, "template", f"{shot}_ece.h5")) 
+            tb = torch.tensor(fp['ece']["xdata"][:]) # Get time-base
+            
+            t_inds = self._get_time_sampling(tb)
 
-        # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
-        prof_data = torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"]
-                                           [t_inds] for channel in self.channels],
-                                          axis=1)
-                                 )
-        fp.close()
+            if prof_data == None:
+                # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
+                prof_data = torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"]
+                                                [t_inds] for channel in self.channels],
+                                                axis=1)
+                                        )
+            else:
+                prof_data = torch.cat((prof_data, torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"]
+                                                [t_inds] for channel in self.channels],
+                                                axis=1))), 0)
+            fp.close()
 
         elapsed = time.time() - t0_p
         logging.info(f"Loading raw ECE, t={self.tstart}-{self.tend}s took {elapsed}s")
