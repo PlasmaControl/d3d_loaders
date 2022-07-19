@@ -17,15 +17,15 @@ shotnr = [163163, 169113]
 
 # Time sampling parameters, all in ms
 t_params = {
-    "tstart" : 0.001,
-    "tend"   : 2000.0,
-    "tsample": 1.0   
+    "tstart" : 0.001,  # Start time
+    "tend"   : 2000.0, # End time
+    "tsample": 1.0     # Sampling rate
 }
 
 # Which signals to use for prediction
 predictors = ["ae_prob", "pinj", "neut", "ip", "dens"]
 
-# Calculate probabilities 10ms into future
+# Calculate changes in probabilities 10ms into future
 shift = {'ae_prob_delta':10.0}
 
 batch_size = 64
