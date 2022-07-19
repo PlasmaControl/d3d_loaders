@@ -3,8 +3,6 @@
 """Contains class definitions used to as abstractions for 1d signals."""
 
 from os.path import join
-from math import ceil
-from re import L
 import time
 
 import numpy as np
@@ -13,13 +11,12 @@ import torch
 
 import logging
 
-
 class signal_1d():
     """Base class for a 1d sample.
 
     Represents a 1-d signal over [tstart:tend].
     Aims to use data stored in /projects/EKOLEMEN/aza_lenny_data1/template.
-    Currently supports only ece, pinj, and other data contained in profiles.h5
+    Check README for currently supported signals.
 
 
     """
@@ -82,6 +79,9 @@ class signal_1d():
         """
         Use the time base to calculate the closest indices to desired tsample
         
+        NOTE: 
+        If tsample is set to -1, will return the full signal between tstart and tend
+        
         Parameters
         ----------
         tb : float array
@@ -92,7 +92,14 @@ class signal_1d():
         t_inds: int array
                     Index of closest measurement to desired time
                     (desired time is a ceiling so no data from future)
-        """       
+        """      
+        # Return full signal if tsample is -1
+        if self.tsample == -1:
+            # Finds closest start and end indices, forward or backwards in time
+            tstart_ind = np.searchsorted(tb, self.tstart)
+            tend_ind = np.searchsorted(tb, self.tend)
+            return np.arange(tstart_ind, tend_ind)
+         
         # Forced sampling times
         time_samp_vals = np.arange(self.tstart, self.tend, self.tsample)
         
@@ -103,8 +110,8 @@ class signal_1d():
         num_samples = len(time_samp_vals)
         t_inds = np.zeros((num_samples,), dtype=int)
         
-        # Make sure our first sample is after first true measurement was taken
-        if not tb[0] < time_samp_vals[0]:
+        # Raise error if first time sample comes before first measurement
+        if tb[0] > time_samp_vals[0]:
             raise(ValueError(f'Time of first sample is before first real measurement was taken for {self.name}'))
         
         for i, time_samp in enumerate(time_samp_vals):
@@ -120,7 +127,8 @@ class signal_1d():
     def _cache_data(self):
         """Default reader to cache data from hdf5 file. 
         
-        Works for neutrons, ip, ech, and kappa. This function is overwritten by pinj and 2d signals
+        Works for all the 1d signals except for pinj. 
+        This function is overwritten by pinj and 2d signals
 
         Returns
         -------
@@ -207,7 +215,7 @@ class signal_neut(signal_1d):
 
 
 class signal_ip(signal_1d):
-    "ip 1d signal"
+    "Injected power 1d signal"
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         self.key = "ip"
         self.file_label = "profiles"
@@ -224,9 +232,7 @@ class signal_ech(signal_1d):
         super().__init__(shotnr, t_params, datapath, device)
     
 class signal_q95(signal_1d):
-    """q95 value - 1d signal
-    
-    """
+    """q95 value - 1d signal"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         self.key = "q95"
         self.file_label = "profiles"

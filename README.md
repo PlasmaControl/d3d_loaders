@@ -6,12 +6,13 @@ files compiled in `/projects/EKOLEMEN/aza_lenny_data1`.
 Its structure is copied off of Pytorch's
 [Iterable Datasets](https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset)
 
-Examples
+Load Multiple Signals in Single Dataset
 ========
 
 Import and instantiate the loader like this:
 ```python
 from d3d_loaders.d3d_loaders import D3D_dataset
+shotnr = 169113
 t_params = {'tstart' : tstart,
             'tend'   : tend,
             'tsample': tsample
@@ -27,11 +28,12 @@ my_ds = D3D_dataset(shotnr, t_params,
 
 Here `shotnr` gives the shots to work on, `tstart` and `tend` define a time interval for the
 signals, and `tsample` defines the common sampling time for all signals.
-`predictors` defines a list of signals that are used to predict the `target`.
-`shift_targets` is the amount each time signal should be shifted, except for `ae_prob_delta` 
-where it is the interval we are looking into the future to calculate our change in probability. 
+`predictors` defines a list of signals that are used to predict the `target`. A list of currently supported 
+predictors is given in a table below. `shift_targets` is the amount each time signal 
+should be shifted, except for `ae_prob_delta` where it is the interval we are 
+looking into the future to calculate our change in probability. 
 They will be stored in the dictionaries `my_ds.predictors` and `my_ds.target`
-respectively. Each value of these dicts is a derived class of `signal_1d`.
+respectively. 
 
 Currently, the only target is `ae_prob_delta`, calculated using AE probabilities from Aza's RCN model. 
 The current predictors are:
@@ -52,6 +54,11 @@ The current predictors are:
 | Lower Triangularity   | tri_l   |
 | Upper Triangularity   | tri_u   |
 | Raw ECE Channels      | raw_ece |
+
+NOTE: the shape signal of kappa and shape profiles of upper and lower triangularity don't have data even though
+the keys exist in the hdf5 files. You should get a helpful error telling you this, however you may also get
+an error telling you of an array splicing error. Also when these signals do exist, the first signal is very 
+late, so make sure `tstart` is sufficiently large. 
 
 At a given index, the output is a list of 2 tensors.
 ```
@@ -80,3 +87,29 @@ for i in torch.utils.data.DataLoader(my_ds):
 
 An example of how to use this dataloader for predictive modelling is in 'runme.py'
 
+Load Full Resolution Single Signal
+========
+By setting `tsample=-1`, the full resolution will return with the `tstart` and `tend` 
+found closest to the true measurement values (forwards or backwards in time). This will
+not load as a dataset since you cannot temporally align the full resolution signals. 
+An example for loading  neutron rate into a numpy array is below
+
+```python
+from d3d_loaders.signal1d import signal_neut
+shotnr = 169113
+t_params = {'tstart' : tstart,
+            'tend'   : tend,
+            'tsample': -1
+}
+
+sig_neut = signal_neut(shotnr, t_params)
+
+data = sig_neut.data.numpy()
+```
+
+
+Additional Files
+========
+
+Another good reference is `test_datasets.ipynb` loads and plot 
+all supported signals as well as a dataset that contains both 1d and 2d signals. 

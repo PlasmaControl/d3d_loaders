@@ -41,12 +41,13 @@ class D3D_dataset(torch.utils.data.Dataset):
                         tend : float
                             End time, in milliseconds
                         tsample : float
-                                Time between samples, in milliseconds
+                                Time between samples, in milliseconds. Data is up or down sampled
+                                to reach this time. Always uses most recent measurement, no averaging.
         shift_targets : dict
                        Keys have to match names of the predictors or targets.
-                       Values define an offset that is added to the signals timebase, except for
-                       ae_prob_delta where it is the amount we look into the future to calculate
-                       our change in probability.
+                       Values define an offset that is added to the signals timebase
+                       EXCEPT FOR: ae_prob_delta where it is the amount we look 
+                       into the future to calculate our change in probability.
         device : string
                  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -58,9 +59,6 @@ class D3D_dataset(torch.utils.data.Dataset):
         At each iteration, the data loader fetches a set of data for a given 
         shot for t0.
         In addition, the loader returns the target at a time t0 + shift_target
-
-        Data is sampled at tsample. tsample should be an integer multiple of
-        dt_ece, dt_p, and dt_neu.
 
         """
 
@@ -74,6 +72,8 @@ class D3D_dataset(torch.utils.data.Dataset):
 
         logging.info(f"Using device {device}")
 
+        if self.tsample == -1:
+            raise(ValueError('Cannot load full data with using full dataloader (tsample==-1)'))
         assert(self.tstart < self.tend)
         assert((self.tend - self.tstart) > self.tsample)
         self.predictors = {}
@@ -90,10 +90,11 @@ class D3D_dataset(torch.utils.data.Dataset):
                 t_shift = 0.0
             t_params_key["t_shift"] = t_shift
             
+            # Load Signal
             if pred_name == "pinj":
                 logging.info(f"Adding pinj to predictor list.")
                 self.predictors["pinj"] = signal_pinj(shotnr, t_params_key, device=device)
-                
+
             elif pred_name == "ae_prob":
                 logging.info(f"Adding ae_prob to predictor list.")
                 self.predictors["ae_prob"] = signal_ae_prob(shotnr, t_params_key, device=device)
@@ -146,10 +147,10 @@ class D3D_dataset(torch.utils.data.Dataset):
                 logging.info(f"Adding raw ECE signals to predictor list.") 
                 channels = []
                 self.predictors["raw_ece"] = signal_ece(shotnr, t_params_key, device=device, channels=channels)
-            
+            # Add other predictors here
             else:
                 raise(ValueError(f'{pred_name} is not a valid predictor'))
-            # Add other predictors here
+            
 
 
         for target_name in targets:
@@ -162,9 +163,10 @@ class D3D_dataset(torch.utils.data.Dataset):
             if target_name == "ae_prob_delta":
                 logging.info(f"Adding ae_prob_delta to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              
                 self.targets["ae_prob_delta"] = signal_ae_prob_delta(shotnr, t_params_key, t_shift, device=device)
-            
             # Add other targets here
-            
+            else:
+                raise(ValueError(f'{target_name} is not a valid target'))
+
 
         # Assert that all data has the same number of samples
         base_key = next(iter(self.predictors.keys()))

@@ -3,7 +3,6 @@
 """Contains class definitions used to as abstractions for 2d signals."""
 
 from os.path import join
-from math import ceil
 import time
 import pickle
 import numpy as np
@@ -24,7 +23,7 @@ class signal_2d(signal_1d):
 
     Represents a 2-d signal over [tstart:tend].
     Aims to use data stored in /projects/EKOLEMEN/aza_lenny_data1/template.
-    Currently supports only ece, pinj, and other data contained in profiles.h5
+    Check README for currently supported signals.
 
     """    
 
@@ -61,9 +60,7 @@ class signal_2d(signal_1d):
 
 
 class signal_dens(signal_2d):
-    """_summary_
-    
-    """
+    """Density profile - 2d signal"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         self.key = "edensfit"
         self.file_label = "profiles"
@@ -72,9 +69,7 @@ class signal_dens(signal_2d):
 
 
 class signal_temp(signal_2d):
-    """_summary_
-    
-    """
+    """Electron Temperature profile - 2d signal"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         self.key = "etempfit"
         self.file_label = "profiles"
@@ -83,9 +78,7 @@ class signal_temp(signal_2d):
 
 
 class signal_pres(signal_2d):
-    """_summary_
-    
-    """
+    """Pressure profile - 2d signal"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         self.key = "pres"
         self.file_label = "profiles"
@@ -94,9 +87,7 @@ class signal_pres(signal_2d):
     
     
 class signal_q(signal_2d):
-    """q profile - 2d signal
-    
-    """
+    """q profile - 2d signal"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         self.key = "q"
         self.file_label = "profiles"
@@ -252,6 +243,7 @@ class signal_ae_prob_delta(signal_2d):
 
 
 class signal_tri_l(signal_2d):
+    """Lower triangularity shape profile - 2d signal"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         self.key = "triangularity_l"
         self.file_label = "shape"
@@ -260,6 +252,7 @@ class signal_tri_l(signal_2d):
         
 
 class signal_tri_u(signal_2d):
+    """Upper triangularity shape profile - 2d signal"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         self.key = "triangularity_u"
         self.file_label = "shape"
