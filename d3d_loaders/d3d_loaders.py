@@ -6,8 +6,8 @@ Implements an iterable dataset for the HDF5 data stored in
 """
 
 import torch
-from d3d_loaders.signal1d import signal_pinj, signal_neut
-from d3d_loaders.signal2d import signal_ae_prob, signal_ae_prob_delta
+from d3d_loaders.signal1d import *
+from d3d_loaders.signal2d import *
 
 import logging
 
@@ -80,6 +80,7 @@ class D3D_dataset(torch.utils.data.Dataset):
         self.targets = {}
 
         # Initialize all predictors
+        logging.info(f"t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")         
         for pred_name in predictors:
             # Get t_shift from shift_target
             t_params_key = t_params.copy()
@@ -90,17 +91,62 @@ class D3D_dataset(torch.utils.data.Dataset):
             t_params_key["t_shift"] = t_shift
             
             if pred_name == "pinj":
-                logging.info(f"Adding pinj to predictor list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")
+                logging.info(f"Adding pinj to predictor list.")
                 self.predictors["pinj"] = signal_pinj(shotnr, t_params_key, device=device)
                 
-            if pred_name == "ae_prob":
-                logging.info(f"Adding ae_prob to predictor list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")
+            elif pred_name == "ae_prob":
+                logging.info(f"Adding ae_prob to predictor list.")
                 self.predictors["ae_prob"] = signal_ae_prob(shotnr, t_params_key, device=device)
                 
-            if pred_name == "neut":
-                logging.info(f"Adding neutron rate to predictor list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")         
+            elif pred_name == "neut":
+                logging.info(f"Adding neutron rate to predictor list.")         
                 self.predictors["neut"] = signal_neut(shotnr, t_params_key, device=device)
+            
+            elif pred_name == "ip":
+                logging.info(f"Adding injected power to predictor list.")         
+                self.predictors["ip"] = signal_ip(shotnr, t_params_key, device=device)
                 
+            elif pred_name == "ech":
+                logging.info(f"Adding ECH to predictor list.")         
+                self.predictors["ech"] = signal_ech(shotnr, t_params_key, device=device)
+            
+            elif pred_name == "q95":
+                logging.info(f"Adding q95 to predictor list.")         
+                self.predictors["q95"] = signal_q95(shotnr, t_params_key, device=device)
+                
+            elif pred_name == "kappa":
+                logging.info(f"Adding kappa to predictor list.")         
+                self.predictors["kappa"] = signal_kappa(shotnr, t_params_key, device=device)
+                
+            elif pred_name == "dens":
+                logging.info(f"Adding density profile to predictor list.")         
+                self.predictors["dens"] = signal_dens(shotnr, t_params_key, device=device)
+                
+            elif pred_name == "pres":
+                logging.info(f"Adding pressure profile to predictor list.")         
+                self.predictors["pres"] = signal_pres(shotnr, t_params_key, device=device)
+                
+            elif pred_name == "temp":
+                logging.info(f"Adding temperature profile to predictor list.")         
+                self.predictors["temp"] = signal_temp(shotnr, t_params_key, device=device)
+                
+            elif pred_name == "q":
+                logging.info(f"Adding q profile to predictor list.")         
+                self.predictors["q"] = signal_q(shotnr, t_params_key, device=device)
+                
+            elif pred_name == "tri_l":
+                logging.info(f"Adding lower triangularity to predictor list.")         
+                self.predictors["tri_l"] = signal_tri_l(shotnr, t_params_key, device=device)
+            
+            elif pred_name == "tri_u":
+                logging.info(f"Adding upper triangularity to predictor list.")         
+                self.predictors["tri_u"] = signal_tri_u(shotnr, t_params_key, device=device)
+                
+            elif pred_name == "raw_ece":
+                logging.info(f"Adding raw ECE signals to predictor list.") 
+                channels = []
+                self.predictors["raw_ece"] = signal_ece(shotnr, t_params_key, device=device, channels=channels)
+            
             # Add other predictors here
 
 

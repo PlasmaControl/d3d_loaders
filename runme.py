@@ -12,14 +12,21 @@ import numpy as np
 import logging
 from d3d_loaders.d3d_loaders import D3D_dataset
 
-# Consider 4 seconds of shot 170716
-shotnr = 170716
+# Consider 2 seconds of shot 170716 and 138386
+shotnr = [138386, 170716]
 
+# Time sampling parameters, all in ms
 t_params = {
     "tstart" : 0.001,
-    "tend"   : 4000.0,
+    "tend"   : 2000.0,
     "tsample": 1.0   
 }
+
+# Which signals to use for prediction
+predictors = ["ae_prob", "pinj", "neut", "ip", "dens"]
+
+# Calculate probabilities 10ms into future
+shift = {'ae_prob_delta':10.0}
 
 batch_size = 64
 num_epochs = 200
@@ -31,9 +38,9 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # * Change in Alfven probability over 10 ms as target
 # * Data will be loaded from HDF5 files and moved to the device
 ds = D3D_dataset(shotnr, t_params, 
-        predictors=["pinj", "neut", "ae_prob"],
+        predictors=predictors,
         targets=["ae_prob_delta"],
-        shift_targets={'ae_prob_delta':10.0},
+        shift_targets=shift,
         device=device)
 
 # Set up train/validation split
