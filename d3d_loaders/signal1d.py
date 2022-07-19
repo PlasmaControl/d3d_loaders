@@ -133,8 +133,12 @@ class signal_1d():
         data = None
         for shot in self.shotnr:
             fp = h5py.File(join(self.datapath, "template", f"{shot}_{self.file_label}.h5")) 
+            
+            # Checks to make sure predictor is present
+            if np.asarray(fp[self.key]["xdata"]) == -1: 
+                raise(ValueError(f'Shot {shot} does not have {self.name}'))
+            
             tb = torch.tensor(fp[self.key]["xdata"][:])
-
             t_inds = self._get_time_sampling(tb)
             
             if data == None:

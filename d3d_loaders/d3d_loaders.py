@@ -80,7 +80,7 @@ class D3D_dataset(torch.utils.data.Dataset):
         self.targets = {}
 
         # Initialize all predictors
-        logging.info(f"t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")         
+        logging.info(f"t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={shift_targets['ae_prob_delta']}")         
         for pred_name in predictors:
             # Get t_shift from shift_target
             t_params_key = t_params.copy()
@@ -147,6 +147,8 @@ class D3D_dataset(torch.utils.data.Dataset):
                 channels = []
                 self.predictors["raw_ece"] = signal_ece(shotnr, t_params_key, device=device, channels=channels)
             
+            else:
+                raise(ValueError(f'{pred_name} is not a valid predictor'))
             # Add other predictors here
 
 

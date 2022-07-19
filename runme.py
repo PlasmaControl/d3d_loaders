@@ -12,8 +12,8 @@ import numpy as np
 import logging
 from d3d_loaders.d3d_loaders import D3D_dataset
 
-# Consider 2 seconds of shot 170716 and 138386
-shotnr = [138386, 170716]
+# Consider 2 seconds of shot 163163 and 196113
+shotnr = [163163, 169113]
 
 # Time sampling parameters, all in ms
 t_params = {
