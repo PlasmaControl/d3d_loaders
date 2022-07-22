@@ -44,7 +44,11 @@ class signal_2d(signal_1d):
         prof_data = None
         for shot in self.shotnr:
             fp = h5py.File(join(self.datapath, "template", f"{shot}_{self.file_label}.h5")) 
-            tb = torch.tensor(fp[self.key]["xdata"][:]) # Get time-base
+            try:
+                tb = torch.tensor(fp[self.key]["xdata"][:]) # Get time-base
+            except ValueError as e:
+                logging.error(f"Unable to load timebase for shot {shot} signal {self.name}")
+                raise e
             
             t_inds = self._get_time_sampling(tb)
             if prof_data == None:

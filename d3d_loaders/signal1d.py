@@ -134,6 +134,11 @@ class signal_1d():
         -------
         data : tensor
                         Data time series of diagnostic. dim0: samples. dim1: features
+
+        Raises
+        ------
+        ValueError
+            When the timebase can't be loaded from HDF we assume that there is no data as well.
         """
         # Load neutron data at t0 and t0 + 50ms. dt for this data is 50ms
         t0_p = time.time()
@@ -143,10 +148,12 @@ class signal_1d():
             fp = h5py.File(join(self.datapath, "template", f"{shot}_{self.file_label}.h5")) 
             
             # Checks to make sure predictor is present
-            if np.asarray(fp[self.key]["xdata"]) == -1: 
-                raise(ValueError(f'Shot {shot} does not have {self.name}'))
-            
-            tb = torch.tensor(fp[self.key]["xdata"][:])
+            try:
+                tb = torch.tensor(fp[self.key]["xdata"][:])
+            except ValueError as e:
+                logging.error(f"Unable to load timebase for shot {shot} signal {self.name}")
+                raise e
+
             t_inds = self._get_time_sampling(tb)
             
             if data == None:
