@@ -42,20 +42,19 @@ class signal_2d(signal_1d):
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         prof_data = None
-        for shot in self.shotnr:
-            fp = h5py.File(join(self.datapath, "template", f"{shot}_{self.file_label}.h5")) 
-            try:
-                tb = torch.tensor(fp[self.key]["xdata"][:]) # Get time-base
-            except ValueError as e:
-                logging.error(f"Unable to load timebase for shot {shot} signal {self.name}")
-                raise e
-            
-            t_inds = self._get_time_sampling(tb)
-            if prof_data == None:
-                prof_data = (torch.tensor(fp[self.key]["zdata"][:]).T)[t_inds,:]
-            else:
-                prof_data = torch.cat((prof_data, (torch.tensor(fp[self.key]["zdata"][:]).T)[t_inds,:]), 0)
-            fp.close()
+        fp = h5py.File(join(self.datapath, "template", f"{shotnr}_{self.file_label}.h5")) 
+        try:
+            tb = torch.tensor(fp[self.key]["xdata"][:]) # Get time-base
+        except ValueError as e:
+            logging.error(f"Unable to load timebase for shot {shotnr} signal {self.name}")
+            raise e
+        
+        t_inds = self._get_time_sampling(tb)
+        if prof_data == None:
+            prof_data = (torch.tensor(fp[self.key]["zdata"][:]).T)[t_inds,:]
+        else:
+            prof_data = torch.cat((prof_data, (torch.tensor(fp[self.key]["zdata"][:]).T)[t_inds,:]), 0)
+        fp.close()
 
         elapsed = time.time() - t0_p
         logging.info(f"Loading {self.name}, t={self.tstart}-{self.tend}s took {elapsed}s")
@@ -146,24 +145,22 @@ class signal_ae_prob(signal_2d):
         ae_probs : tensor
                    Probability for presence of an Alfven Eigenmode. dim0: samples. dim1: features
         """
-
         # Find how many samples apart tsample is
         t0_p = time.time()
         # Don't use scope. This throws off multi-threaded loaders
         ece_data = None
-        for shot in self.shotnr:
-            fp = h5py.File(join(self.datapath, "template", f"{shot}_ece.h5"), "r") 
-            tb = fp["ece"]["xdata"][:]    # Get ECE time-base
-    
-            t_inds = self._get_time_sampling(tb)
-
-            # Read in all ece_data at t0 and shifted at t0 + 50 mus
-            if type(ece_data) == type(None):
-                ece_data = np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t_inds] for i in range(40)]).T
-            else:
-                ece_data = np.append(ece_data, np.vstack([fp["ece"][f"tecef{(i+1):02d}"][t_inds] for i in range(40)]).T, 0)
-            fp.close()
-            # After this we have ece_data_0.shape = (num_samples / nth_sample, 40)
+        fname = join(self.datapath, "template", f"{self.shotnr}_ece_pcece.h5")
+        print("------------------------ HOT_FIXING FILENAME FOR 1806XX SHOTS -------------")
+        print(f"loading from {fname}")
+        print("------------------------ HOT_FIXING FILENAME FOR 1806XX SHOTS -------------")
+        fp = h5py.File(fname, "r") 
+        #fp = h5py.File(join(self.datapath, "template", f"{shot}_ece_pcece.h5"), "r") 
+        tb = fp["ece"]["xdata"][:]    # Get ECE time-base
+        t_inds = self._get_time_sampling(tb)
+        # Read in ece_data  as numpy array for consumption 
+        ece_data = np.vstack([fp["ece"][f"cece{(i+1):02d}"][t_inds] for i in range(40)]).T
+        fp.close()
+        # After this we have ece_data_0.shape = (num_samples / nth_sample, 40)
 
         # Pre-allocate array for AE mode probabilities
         # dim0: time index

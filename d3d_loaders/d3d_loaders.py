@@ -30,8 +30,8 @@ class D3D_dataset(torch.utils.data.Dataset):
 
         Parameters
         ----------
-        shotnr : array of ints
-                 shot numbers
+        shotnr : int 
+                 shot number
 
         t_params : dict
                    Contains the following keys:
@@ -162,7 +162,7 @@ class D3D_dataset(torch.utils.data.Dataset):
             
             if target_name == "ae_prob_delta":
                 logging.info(f"Adding ae_prob_delta to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              
-                self.targets["ae_prob_delta"] = signal_ae_prob_delta(shotnr, t_params_key, t_shift, device=device)
+                self.targets["ae_prob_delta"] = signal_ae_prob_delta(shotnr, t_params_key, t_shift, datapath=datapath, device=device)
             # Add other targets here
             else:
                 raise(ValueError(f'{target_name} is not a valid target'))

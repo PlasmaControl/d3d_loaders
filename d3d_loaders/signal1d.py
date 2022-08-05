@@ -27,8 +27,8 @@ class signal_1d():
 
         Parameters
         ----------
-        shotnr : Array of ints or single int
-                 Shot numbers
+        shotnr : int
+                 Shot number
 
         t_params : dict
                    Contains the following necessary keys:
@@ -49,10 +49,6 @@ class signal_1d():
         device : string, default='cpu'
                  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         """
-        # Turn shotnr to array if single int
-        if type(shotnr) == int:
-            shotnr = [shotnr]
-            
         # Store function arguments as member variables
         self.shotnr = shotnr
         self.tstart = t_params["tstart"]
@@ -143,25 +139,17 @@ class signal_1d():
         # Load neutron data at t0 and t0 + 50ms. dt for this data is 50ms
         t0_p = time.time()
         # Don't use with... scope. This throws off dataloader
-        data = None
-        for shot in self.shotnr:
-            fp = h5py.File(join(self.datapath, "template", f"{shot}_{self.file_label}.h5")) 
-            
-            # Checks to make sure predictor is present
-            try:
-                tb = torch.tensor(fp[self.key]["xdata"][:])
-            except ValueError as e:
-                logging.error(f"Unable to load timebase for shot {shot} signal {self.name}")
-                raise e
-
-            t_inds = self._get_time_sampling(tb)
-            
-            if data == None:
-                data = torch.tensor(fp[self.key]["zdata"][:])[t_inds]
-            else:
-                # Append new shot along samples axis (axis=0)
-                data = torch.cat((data, torch.tensor(fp[self.key]["zdata"][:])[t_inds]), 0)
-            fp.close()
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_{self.file_label}.h5")) 
+        # Checks to make sure predictor is present
+        try:
+            tb = torch.tensor(fp[self.key]["xdata"][:])
+        except ValueError as e:
+            logging.error(f"Unable to load timebase for shot {self.shotnr} signal {self.name}")
+            raise e
+        # Indices to sample on
+        t_inds = self._get_time_sampling(tb)        
+        data = torch.tensor(fp[self.key]["zdata"][:])[t_inds]
+        fp.close()
 
         elapsed = time.time() - t0_p       
         logging.info(f"Caching {self.name} data for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
@@ -195,16 +183,15 @@ class signal_pinj(signal_1d):
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         pinj_data = None
-        for shot in self.shotnr:
-            fp = h5py.File(join(self.datapath, "template", f"{shot}_pinj.h5")) 
-            tb = torch.tensor(fp["pinjf_15l"]["xdata"][:]) # Get time-base
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_pinj.h5")) 
+        tb = torch.tensor(fp["pinjf_15l"]["xdata"][:]) # Get time-base
 
-            t_inds = self._get_time_sampling(tb)
-            if pinj_data == None:
-                pinj_data = sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in fp.keys()])
-            else:
-                pinj_data = torch.cat((pinj_data, sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in fp.keys()])), 0)
-            fp.close()
+        t_inds = self._get_time_sampling(tb)
+        if pinj_data == None:
+            pinj_data = sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in fp.keys()])
+        else:
+            pinj_data = torch.cat((pinj_data, sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in fp.keys()])), 0)
+        fp.close()
 
         elapsed = time.time() - t0_p
         logging.info(f"Caching pinj data for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
