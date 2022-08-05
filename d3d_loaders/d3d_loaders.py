@@ -97,7 +97,7 @@ class D3D_dataset(torch.utils.data.Dataset):
 
             elif pred_name == "ae_prob":
                 logging.info(f"Adding ae_prob to predictor list.")
-                self.predictors["ae_prob"] = signal_ae_prob(shotnr, t_params_key, datapat=self.datapath, device=device)
+                self.predictors["ae_prob"] = signal_ae_prob(shotnr, t_params_key, datapath=self.datapath, device=device)
                 
             elif pred_name == "neut":
                 logging.info(f"Adding neutron rate to predictor list.")         
