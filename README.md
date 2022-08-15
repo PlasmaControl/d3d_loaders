@@ -54,6 +54,10 @@ The current predictors are:
 | Lower Triangularity   | tri_l   |
 | Upper Triangularity   | tri_u   |
 | Raw ECE Channels      | raw_ece |
+| Raw CO2 dp Channels   | raw_co2_dp |
+| Raw CO2 pl Channels   | raw_co2_pl |
+| Raw MPI Channels      | raw_mpi |
+| Raw BES Channels      | raw_bes |
 
 NOTE: the shape signal of kappa and shape profiles of upper and lower triangularity don't have data even though
 the keys exist in the hdf5 files. You should get a helpful error telling you this, however you may also get

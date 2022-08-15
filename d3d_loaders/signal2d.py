@@ -42,11 +42,11 @@ class signal_2d(signal_1d):
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         prof_data = None
-        fp = h5py.File(join(self.datapath, "template", f"{shotnr}_{self.file_label}.h5")) 
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_{self.file_label}.h5")) 
         try:
             tb = torch.tensor(fp[self.key]["xdata"][:]) # Get time-base
         except ValueError as e:
-            logging.error(f"Unable to load timebase for shot {shotnr} signal {self.name}")
+            logging.error(f"Unable to load timebase for shot {self.shotnr} signal {self.name}")
             raise e
         
         t_inds = self._get_time_sampling(tb)
@@ -294,27 +294,231 @@ class signal_ece(signal_2d):
 
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        prof_data = None
-        for shot in self.shotnr:
-            fp = h5py.File(join(self.datapath, "template", f"{shot}_ece.h5")) 
-            tb = torch.tensor(fp['ece']["xdata"][:]) # Get time-base
-            
-            t_inds = self._get_time_sampling(tb)
+        
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_ece.h5")) 
+        tb = torch.tensor(fp['ece']["xdata"][:]) # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
 
-            if prof_data == None:
-                # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
-                prof_data = torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"]
-                                                [t_inds] for channel in self.channels],
-                                                axis=1)
-                                        )
-            else:
-                prof_data = torch.cat((prof_data, torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"]
-                                                [t_inds] for channel in self.channels],
-                                                axis=1))), 0)
-            fp.close()
+        # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"]
+                                        [t_inds] for channel in self.channels],
+                                        axis=1)
+                                    )
+        fp.close()
 
         elapsed = time.time() - t0_p
         logging.info(f"Loading raw ECE, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
+
+class signal_co2_dp(signal_2d):
+    """Raw CO2 signals (change in CO2 phase data)
+
+    Returns
+    -------
+    co2_dp_data : tensor
+                Data time series for profiles. dim0: co2 signals. dim1: samples
+    """
+    def __init__(self, shotnr, t_params, 
+                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu",
+                 channels=['r0','v1','v2','v3']):
+        """
+        Unique part of constructor is channels. For CO2, it must be a subset (or default is all)
+        of the 4 interferometers: r0, v1, v2, and v3
+        """
+        self.channels = channels
+        self.name = 'raw co2 dp'
+        super().__init__(shotnr, t_params, datapath, device)
+        
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Assumes the xdata and zdata keys are present and data resides in the shotnr_profile.h5 files.
+        Other signals will need to override this function to cache data correctly.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_co2_dp.h5")) 
+        tb = torch.tensor(fp["co2_time"][:]) # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
+
+        # Load and stack CO2 channels, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp["dp1"+channel+"uf"][t_inds] 
+                                           for channel in self.channels],
+                                        axis=1)
+                                    )
+        fp.close()
+
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading raw CO2 dp, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
+
+class signal_co2_pl(signal_2d):
+    """Raw CO2 signals (integrated change in CO2 phase data)
+    NOTE: Not really sure what this is but this is no the same as dp signal.
+    It also may not be available real-time
+
+    Returns
+    -------
+    co2_pl_data : tensor
+                Data time series for profiles. dim0: CO2 channels. dim1: samples
+    """
+    def __init__(self, shotnr, t_params, 
+                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu",
+                 channels=['r0','v1','v2','v3']):
+        """
+        Unique part of constructor is channels. For CO2, it must be a subset (or default is all)
+        of the 4 interferometers: r0, v1, v2, and v3
+        """
+        self.channels = channels
+        self.name = 'raw co2 pl'
+        super().__init__(shotnr, t_params, datapath, device)
+        
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Assumes the xdata and zdata keys are present and data resides in the shotnr_profile.h5 files.
+        Other signals will need to override this function to cache data correctly.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_co2_pl.h5")) 
+        tb = torch.tensor(fp["co2_time"][:]) # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
+
+        # Load and stack CO2 channels, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp["pl1"+channel+"_uf"][t_inds] 
+                                           for channel in self.channels],
+                                        axis=1)
+                                    )
+        fp.close()
+
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading raw CO2 pl, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
+
+class signal_mpi(signal_2d):
+    """Raw magnetic signals
+
+    Returns
+    -------
+    mpi_data : tensor
+                Data time series for profiles. dim0: mpi66m angles. dim1: samples
+    """
+    def __init__(self, shotnr, t_params, 
+                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu",
+                 angles=[67,97,127,157,247,277,307,340]):
+        """
+        Unique part of constructor is angles. Must be a subset (or the default all) 
+        of the following angles: 
+        """
+        self.angles = angles
+        self.name = 'raw ece'
+        super().__init__(shotnr, t_params, datapath, device)
+        
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Assumes the xdata and zdata keys are present and data resides in the shotnr_profile.h5 files.
+        Other signals will need to override this function to cache data correctly.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_mpi.h5")) 
+        tb = torch.tensor(fp["times"][:]) # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
+
+        # Load and stack MPI angles, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp[f"mpi66m{angle:03d}f"][t_inds] 
+                                           for angle in self.angles],
+                                        axis=1)
+                                    )
+        fp.close()
+
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading raw MPI, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
+
+class signal_BES(signal_2d):
+    """Raw BES signals
+
+    Returns
+    -------
+    bes_data : tensor
+                Data time series for profiles. dim0: BES channels. dim1: samples
+    """
+    def __init__(self, shotnr, t_params, 
+                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu",
+                 channels=range(1,65)):
+        """
+        Unique part of constructor is channels. Can be any list of numbers from 1-64, or 
+        just an individual channel. 
+        """
+        self.channels = channels
+        self.name = 'raw BES'
+        super().__init__(shotnr, t_params, datapath, device)
+        
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Assumes the xdata and zdata keys are present and data resides in the shotnr_profile.h5 files.
+        Other signals will need to override this function to cache data correctly.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_BES.h5")) 
+        tb = torch.tensor(fp["times"][:]) # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
+
+        # Load and stack BES channels, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp[f"BESFU{channel:02d}"][t_inds] 
+                                           for channel in self.channels],
+                                        axis=1)
+                                    )
+        fp.close()
+
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading raw BES, t={self.tstart}-{self.tend}s took {elapsed}s")
         
         # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
         return prof_data

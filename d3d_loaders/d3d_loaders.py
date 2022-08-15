@@ -145,8 +145,34 @@ class D3D_dataset(torch.utils.data.Dataset):
                 
             elif pred_name == "raw_ece":
                 logging.info(f"Adding raw ECE signals to predictor list.") 
-                channels = []
-                self.predictors["raw_ece"] = signal_ece(shotnr, t_params_key, datapath=self.datapath, device=device, channels=channels)
+                # Currently no way to subset ECE channels
+                # channels = []
+                self.predictors["raw_ece"] = signal_ece(shotnr, t_params_key, datapath=self.datapath, device=device)
+            
+            elif pred_name == "raw_co2_dp":
+                logging.info(f"Adding raw CO2 dp signals to predictor list.") 
+                # Currently no way to subset CO2 channels
+                # channels = []
+                self.predictors["raw_co2_dp"] = signal_co2_dp(shotnr, t_params_key, datapath=self.datapath, device=device)
+                
+            elif pred_name == "raw_co2_pl":
+                logging.info(f"Adding raw CO2 pl signals to predictor list.") 
+                # Currently no way to subset CO2 channels
+                # channels = []
+                self.predictors["raw_co2_pl"] = signal_co2_pl(shotnr, t_params_key, datapath=self.datapath, device=device)
+            
+            elif pred_name == "raw_mpi":
+                logging.info(f"Adding raw MPI dp signals to predictor list.") 
+                # Currently no way to subset MPI angles
+                # angles = []
+                self.predictors["raw_mpi"] = signal_mpi(shotnr, t_params_key, datapath=self.datapath, device=device)
+            
+            elif pred_name == "raw_bes":
+                logging.info(f"Adding raw BES signals to predictor list.") 
+                # Currently no way to subset BES channels
+                # channels = []
+                self.predictors["raw_bes"] = signal_BES(shotnr, t_params_key, datapath=self.datapath, device=device)
+            
             # Add other predictors here
             else:
                 raise(ValueError(f'{pred_name} is not a valid predictor'))
