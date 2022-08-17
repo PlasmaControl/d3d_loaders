@@ -302,8 +302,8 @@ class signal_ece(signal_2d):
 
         # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
         prof_data = torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"]
-                                        [t_inds] for channel in self.channels],
-                                        axis=1)
+                                        for channel in self.channels],
+                                        axis=1)[t_inds,:]
                                     )
         fp.close()
 
@@ -354,9 +354,9 @@ class signal_co2_dp(signal_2d):
         t_inds = self._get_time_sampling(tb)
 
         # Load and stack CO2 channels, slicing happens in for loop to avoid loading data that would then be cut
-        prof_data = torch.tensor(np.stack([fp["dp1"+channel+"uf"][t_inds] 
+        prof_data = torch.tensor(np.stack([fp["dp1"+channel+"uf"]
                                            for channel in self.channels],
-                                        axis=1)
+                                        axis=1)[t_inds,:] 
                                     )
         fp.close()
 
@@ -409,9 +409,9 @@ class signal_co2_pl(signal_2d):
         t_inds = self._get_time_sampling(tb)
 
         # Load and stack CO2 channels, slicing happens in for loop to avoid loading data that would then be cut
-        prof_data = torch.tensor(np.stack([fp["pl1"+channel+"_uf"][t_inds] 
+        prof_data = torch.tensor(np.stack([fp["pl1"+channel+"_uf"]
                                            for channel in self.channels],
-                                        axis=1)
+                                        axis=1)[t_inds,:] 
                                     )
         fp.close()
 
@@ -462,9 +462,9 @@ class signal_mpi(signal_2d):
         t_inds = self._get_time_sampling(tb)
 
         # Load and stack MPI angles, slicing happens in for loop to avoid loading data that would then be cut
-        prof_data = torch.tensor(np.stack([fp[f"mpi66m{angle:03d}f"][t_inds] 
+        prof_data = torch.tensor(np.stack([fp[f"mpi66m{angle:03d}f"] 
                                            for angle in self.angles],
-                                        axis=1)
+                                        axis=1)[t_inds,:]
                                     )
         fp.close()
 
@@ -515,9 +515,9 @@ class signal_BES(signal_2d):
         t_inds = self._get_time_sampling(tb)
 
         # Load and stack BES channels, slicing happens in for loop to avoid loading data that would then be cut
-        prof_data = torch.tensor(np.stack([fp[f"BESFU{channel:02d}"][t_inds] 
+        prof_data = torch.tensor(np.stack([fp[f"BESFU{channel:02d}"]
                                            for channel in self.channels],
-                                        axis=1)
+                                        axis=1)[t_inds,:] 
                                     )
         fp.close()
 
