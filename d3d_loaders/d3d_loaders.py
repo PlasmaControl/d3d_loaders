@@ -80,7 +80,7 @@ class D3D_dataset(torch.utils.data.Dataset):
         self.targets = {}
 
         # Initialize all predictors
-        logging.info(f"t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={shift_targets['ae_prob_delta']}")         
+        logging.info(f"t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms")         
         for pred_name in predictors:
             # Get t_shift from shift_target
             t_params_key = t_params.copy()
