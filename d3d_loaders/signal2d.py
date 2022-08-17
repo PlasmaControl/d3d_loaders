@@ -313,6 +313,7 @@ class signal_ece(signal_2d):
         # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
         return prof_data
 
+
 class signal_co2_dp(signal_2d):
     """Raw CO2 signals (change in CO2 phase data)
 
@@ -364,6 +365,7 @@ class signal_co2_dp(signal_2d):
         
         # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
         return prof_data
+
 
 class signal_co2_pl(signal_2d):
     """Raw CO2 signals (integrated change in CO2 phase data)
@@ -419,6 +421,7 @@ class signal_co2_pl(signal_2d):
         # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
         return prof_data
 
+
 class signal_mpi(signal_2d):
     """Raw magnetic signals
 
@@ -471,6 +474,7 @@ class signal_mpi(signal_2d):
         # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
         return prof_data
 
+
 class signal_BES(signal_2d):
     """Raw BES signals
 
@@ -519,6 +523,50 @@ class signal_BES(signal_2d):
 
         elapsed = time.time() - t0_p
         logging.info(f"Loading raw BES, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
+
+
+class signal_uci_label(signal_2d):
+    """ Bill's AE labels. These are approximate as he only labeled a single time, 
+    so we take assume AE mode happens in window +-250ms around labeled time. 
+
+    Returns
+    -------
+    uci_label_data : tensor
+                Data time series for profiles. dim0: AE modes. dim1: samples
+                Order of AE modes is: BAAE, BAE, EAE, RSAE, TAE
+    """
+    def __init__(self, shotnr, t_params, 
+                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+        
+        self.name = 'UCI approximate AE labels'
+        super().__init__(shotnr, t_params, datapath, device)
+        
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_uci_label.h5")) 
+        tb = torch.tensor(fp["times"][:]) # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
+
+        # Load AE modes and slice time array
+        prof_data = torch.tensor(fp['label'][t_inds,:])
+        fp.close()
+
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading UCI AE labels, t={self.tstart}-{self.tend}s took {elapsed}s")
         
         # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
         return prof_data

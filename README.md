@@ -58,6 +58,7 @@ The current predictors are:
 | Raw CO2 pl Channels   | raw_co2_pl |
 | Raw MPI Channels      | raw_mpi |
 | Raw BES Channels      | raw_bes |
+| Bill's AE Labels (+-250ms window) | uci_label |
 
 NOTE: the shape signal of kappa and shape profiles of upper and lower triangularity don't have data even though
 the keys exist in the hdf5 files. You should get a helpful error telling you this, however you may also get

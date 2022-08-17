@@ -184,11 +184,16 @@ class D3D_dataset(torch.utils.data.Dataset):
             try:
                 t_shift = self.shift_target[target_name]
             except:
-                t_shift = 10.0 
+                t_shift = 0.0 
             
             if target_name == "ae_prob_delta":
                 logging.info(f"Adding ae_prob_delta to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              
                 self.targets["ae_prob_delta"] = signal_ae_prob_delta(shotnr, t_params_key, t_shift, datapath=datapath, device=device)
+            
+            elif target_name == "uci_label":
+                logging.info(f"Adding uci_label to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              
+                self.targets["uci_label"] = signal_uci_label(shotnr, t_params_key, t_shift, datapath=datapath, device=device)
+ 
             # Add other targets here
             else:
                 raise(ValueError(f'{target_name} is not a valid target'))
