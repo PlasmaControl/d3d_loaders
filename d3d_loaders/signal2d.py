@@ -274,9 +274,8 @@ class signal_ece(signal_2d):
             t_inds = self._get_time_sampling(tb)
 
             # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
-            prof_data = torch.tensor(np.stack([fp[f"tecef{channel:02d}"]
-                                            [t_inds] for channel in self.channels],
-                                            axis=1))
+            prof_data = torch.tensor(np.stack([fp[f"tecef{channel:02d}"] for channel in self.channels],
+                                            axis=1)[t_inds,:])
             fp.close()
         elapsed = time.time() - t0_p
         logging.info(f"Loading raw ECE, t={self.tstart}-{self.tend}s took {elapsed}s")
@@ -513,7 +512,23 @@ class signal_uci_label(signal_2d):
                  datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
         
         self.name = 'UCI approximate AE labels'
-        super().__init__(shotnr, t_params, datapath, device)
+        # Same as super().__init__() except does not scale data
+        self.shotnr = shotnr
+        self.tstart = t_params["tstart"]
+        self.tend = t_params["tend"]
+        self.tsample = t_params["tsample"]
+        try:
+            self.tshift = t_params["tshift"]
+        except:
+            self.tshift = 0.0
+        self.datapath = datapath
+        
+        # Load data from HDF5 file and store, move to device
+        self.data = self._cache_data().to(device)
+        logging.info(f"""Compiled signal {self.__class__.__name__}, 
+                         tstart={self.tstart}, tend={self.tend}, tsample={self.tsample}, tshift={self.tshift},
+                         datapath={self.datapath}, 
+                         mean={self.data_mean}, std={self.data_std}""")
         
     def _cache_data(self):
         """Load 2d profile from hdf5 data file.
