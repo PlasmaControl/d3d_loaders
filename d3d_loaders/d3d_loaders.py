@@ -192,7 +192,7 @@ class D3D_dataset(torch.utils.data.Dataset):
             
             elif target_name == "uci_label":
                 logging.info(f"Adding uci_label to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              
-                self.targets["uci_label"] = signal_uci_label(shotnr, t_params_key, t_shift, datapath=datapath, device=device)
+                self.targets["uci_label"] = signal_uci_label(shotnr, t_params_key, datapath=datapath, device=device)
  
             # Add other targets here
             else:
