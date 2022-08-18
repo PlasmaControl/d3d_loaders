@@ -268,12 +268,12 @@ class signal_ece(signal_2d):
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         fp = h5py.File(join(self.datapath, 'template', f"{self.shotnr}_ece.h5")) 
-        tb = fp['tecef01']["xdata"][:] # Get time-base
+        tb = fp['ece']['tecef01']["xdata"][:] # Get time-base
         
         t_inds = self._get_time_sampling(tb)
 
         # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
-        prof_data = torch.tensor(np.stack([fp[f"tecef{channel:02d}"] for channel in self.channels],
+        prof_data = torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"] for channel in self.channels],
                                         axis=1)[t_inds,:])
         fp.close()
         elapsed = time.time() - t0_p
