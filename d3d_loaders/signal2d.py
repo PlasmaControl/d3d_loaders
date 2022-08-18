@@ -41,12 +41,7 @@ class signal_2d(signal_1d):
 
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        prof_data = None
-<<<<<<< HEAD
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_{self.file_label}.h5")) 
-=======
-        fp = h5py.File(join(self.datapath, f"{shotnr}_{self.file_label}.h5")) 
->>>>>>> d8a0c6c (Adding downloading script)
+        fp = h5py.File(join(self.datapath, f"{shotnr}.h5")) 
         try:
             tb = fp[self.key]["xdata"][:] # Get time-base
         except ValueError as e:
@@ -54,10 +49,7 @@ class signal_2d(signal_1d):
             raise e
         
         t_inds = self._get_time_sampling(tb)
-        if prof_data == None:
-            prof_data = (torch.tensor(fp[self.key]["zdata"][:]).T)[t_inds,:]
-        else:
-            prof_data = torch.cat((prof_data, (torch.tensor(fp[self.key]["zdata"][:]).T)[t_inds,:]), 0)
+        prof_data = (torch.tensor(fp[self.key]["zdata"][:]).T)[t_inds,:]
         fp.close()
 
         elapsed = time.time() - t0_p
