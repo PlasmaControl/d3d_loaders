@@ -44,7 +44,7 @@ class signal_2d(signal_1d):
         prof_data = None
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_{self.file_label}.h5")) 
         try:
-            tb = torch.tensor(fp[self.key]["xdata"][:]) # Get time-base
+            tb = fp[self.key]["xdata"][:] # Get time-base
         except ValueError as e:
             logging.error(f"Unable to load timebase for shot {self.shotnr} signal {self.name}")
             raise e
@@ -296,7 +296,7 @@ class signal_ece(signal_2d):
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_ece.h5")) 
-        tb = torch.tensor(fp['ece']["xdata"][:]) # Get time-base
+        tb = fp['ece']["xdata"][:] # Get time-base
         
         t_inds = self._get_time_sampling(tb)
 
@@ -349,7 +349,7 @@ class signal_co2_dp(signal_2d):
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_co2_dp.h5")) 
-        tb = torch.tensor(fp["co2_time"][:]) # Get time-base
+        tb = fp["co2_time"][:] # Get time-base
         
         t_inds = self._get_time_sampling(tb)
 
@@ -404,7 +404,7 @@ class signal_co2_pl(signal_2d):
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_co2_pl.h5")) 
-        tb = torch.tensor(fp["co2_time"][:]) # Get time-base
+        tb = fp["co2_time"][:] # Get time-base
         
         t_inds = self._get_time_sampling(tb)
 
@@ -457,7 +457,7 @@ class signal_mpi(signal_2d):
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_mpi.h5")) 
-        tb = torch.tensor(fp["times"][:]) # Get time-base
+        tb = fp["times"][:] # Get time-base
         
         t_inds = self._get_time_sampling(tb)
 
@@ -510,7 +510,7 @@ class signal_BES(signal_2d):
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_BES.h5")) 
-        tb = torch.tensor(fp["times"][:]) # Get time-base
+        tb = fp["times"][:] # Get time-base
         
         t_inds = self._get_time_sampling(tb)
 
@@ -557,7 +557,7 @@ class signal_uci_label(signal_2d):
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_uci_label.h5")) 
-        tb = torch.tensor(fp["times"][:]) # Get time-base
+        tb = fp["times"][:] # Get time-base
         
         t_inds = self._get_time_sampling(tb)
 

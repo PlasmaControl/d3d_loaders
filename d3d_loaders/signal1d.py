@@ -184,7 +184,7 @@ class signal_pinj(signal_1d):
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         pinj_data = None
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_pinj.h5")) 
-        tb = torch.tensor(fp["pinjf_15l"]["xdata"][:]) # Get time-base
+        tb = fp["pinjf_15l"]["xdata"][:] # Get time-base
 
         t_inds = self._get_time_sampling(tb)
         if pinj_data == None:
