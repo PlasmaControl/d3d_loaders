@@ -99,14 +99,26 @@ class D3D_dataset(torch.utils.data.Dataset):
                 logging.info(f"Adding ae_prob to predictor list.")
                 self.predictors["ae_prob"] = signal_ae_prob(shotnr, t_params_key, datapath=self.datapath, device=device)
                 
-            elif pred_name == "neut":
+            elif pred_name == "neutronsrate":
                 logging.info(f"Adding neutron rate to predictor list.")         
                 self.predictors["neut"] = signal_neut(shotnr, t_params_key, datapath=self.datapath, device=device)
             
             elif pred_name == "ip":
                 logging.info(f"Adding injected power to predictor list.")         
                 self.predictors["ip"] = signal_ip(shotnr, t_params_key, datapath=self.datapath, device=device)
-                
+            
+            elif pred_name == "iptipp":
+                logging.info(f"Adding target current to predictor list.")
+                self.predictors["iptipp"] = signal_iptipp(shotnr, t_params_key, datapath=self.datapath, device=device)
+
+            elif pred_name == "dstdenp":
+                logging.info(f"Adding target density to predictor list.")
+                self.predictors["dstenp"] = signal_dstenp(shotnr, t_params_key, datapath=self.datapath, device=device)
+
+            elif pred_name == "dssdenest":
+                logging.info("Adding line-averaged density to predictor list")
+                self.predictors["dssdenest"] = signal_dssdenest(shotnr, t_params_key, datapath=self.datapath, device=device)
+
             elif pred_name == "ech":
                 logging.info(f"Adding ECH to predictor list.")         
                 self.predictors["ech"] = signal_ech(shotnr, t_params_key, datapath=self.datapath, device=device)
@@ -135,13 +147,13 @@ class D3D_dataset(torch.utils.data.Dataset):
                 logging.info(f"Adding q profile to predictor list.")         
                 self.predictors["q"] = signal_q(shotnr, t_params_key, datapath=self.datapath, device=device)
                 
-            elif pred_name == "tri_l":
+            elif pred_name == "doutl":
                 logging.info(f"Adding lower triangularity to predictor list.")         
-                self.predictors["tri_l"] = signal_tri_l(shotnr, t_params_key, datapath=self.datapath, device=device)
+                self.predictors["tri_l"] = signal_doutl(shotnr, t_params_key, datapath=self.datapath, device=device)
             
-            elif pred_name == "tri_u":
+            elif pred_name == "doutu":
                 logging.info(f"Adding upper triangularity to predictor list.")         
-                self.predictors["tri_u"] = signal_tri_u(shotnr, t_params_key, datapath=self.datapath, device=device)
+                self.predictors["tri_u"] = signal_doutu(shotnr, t_params_key, datapath=self.datapath, device=device)
                 
             elif pred_name == "raw_ece":
                 logging.info(f"Adding raw ECE signals to predictor list.") 

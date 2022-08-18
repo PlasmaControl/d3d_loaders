@@ -22,7 +22,7 @@ class signal_2d(signal_1d):
     """Base class for a 2d sample. Subclass of 1d signal class. 
 
     Represents a 2-d signal over [tstart:tend].
-    Aims to use data stored in /projects/EKOLEMEN/aza_lenny_data1/template.
+    Aims to use data stored in /projects/EKOLEMEN/d3dloader.
     Check README for currently supported signals.
 
     """    
@@ -42,7 +42,11 @@ class signal_2d(signal_1d):
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         prof_data = None
+<<<<<<< HEAD
         fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_{self.file_label}.h5")) 
+=======
+        fp = h5py.File(join(self.datapath, f"{shotnr}_{self.file_label}.h5")) 
+>>>>>>> d8a0c6c (Adding downloading script)
         try:
             tb = fp[self.key]["xdata"][:] # Get time-base
         except ValueError as e:
@@ -64,7 +68,7 @@ class signal_2d(signal_1d):
 
 class signal_dens(signal_2d):
     """Density profile - 2d signal"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
         self.key = "edensfit"
         self.file_label = "profiles"
         self.name = "dens"
@@ -73,7 +77,7 @@ class signal_dens(signal_2d):
 
 class signal_temp(signal_2d):
     """Electron Temperature profile - 2d signal"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
         self.key = "etempfit"
         self.file_label = "profiles"
         self.name = "temp"
@@ -82,7 +86,7 @@ class signal_temp(signal_2d):
 
 class signal_pres(signal_2d):
     """Pressure profile - 2d signal"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
         self.key = "pres"
         self.file_label = "profiles"
         self.name = "pres"
@@ -91,7 +95,7 @@ class signal_pres(signal_2d):
     
 class signal_q(signal_2d):
     """q profile - 2d signal"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
         self.key = "q"
         self.file_label = "profiles"
         self.name = "q"
@@ -101,7 +105,7 @@ class signal_q(signal_2d):
 class signal_ae_prob(signal_2d):
     """Probability for a given Alfven Eigenmode."""
     def __init__(self, shotnr, t_params, 
-            datapath="/projects/EKOLEMEN/aza_lenny_data1",
+            datapath="/projects/EKOLEMEN/d3dloader",
             device="cpu"):
         """Loads weights for RCN model and calls base class constructor.
         
@@ -148,17 +152,12 @@ class signal_ae_prob(signal_2d):
         # Find how many samples apart tsample is
         t0_p = time.time()
         # Don't use scope. This throws off multi-threaded loaders
-        ece_data = None
-        fname = join(self.datapath, "template", f"{self.shotnr}_ece_pcece.h5")
-        print("------------------------ HOT_FIXING FILENAME FOR 1806XX SHOTS -------------")
-        print(f"loading from {fname}")
-        print("------------------------ HOT_FIXING FILENAME FOR 1806XX SHOTS -------------")
+        fname = join(self.datapath, f"{self.shotnr}.h5")
         fp = h5py.File(fname, "r") 
-        #fp = h5py.File(join(self.datapath, "template", f"{shot}_ece_pcece.h5"), "r") 
-        tb = fp["ece"]["xdata"][:]    # Get ECE time-base
+        tb = fp["tecef01"]["xdata"][:]    # Get ECE time-base
         t_inds = self._get_time_sampling(tb)
         # Read in ece_data  as numpy array for consumption 
-        ece_data = np.vstack([fp["ece"][f"cece{(i+1):02d}"][t_inds] for i in range(40)]).T
+        ece_data = np.vstack([fp[f"tecef{i:02d}"]["zdata"][t_inds] for i in range(1, 41)]).T
         fp.close()
         # After this we have ece_data_0.shape = (num_samples / nth_sample, 40)
 
@@ -243,24 +242,6 @@ class signal_ae_prob_delta(signal_2d):
         logging.info(f"Compiled signal data for shot {shotnr}, mean={self.data_mean}, std={self.data_std}")
 
 
-class signal_tri_l(signal_2d):
-    """Lower triangularity shape profile - 2d signal"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        self.key = "triangularity_l"
-        self.file_label = "shape"
-        self.name = "lower triangularity"
-        super().__init__(shotnr, t_params, datapath, device)
-        
-
-class signal_tri_u(signal_2d):
-    """Upper triangularity shape profile - 2d signal"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
-        self.key = "triangularity_u"
-        self.file_label = "shape"
-        self.name = "upper triangularity"
-        super().__init__(shotnr, t_params, datapath, device)
-
-
 class signal_ece(signal_2d):
     """Raw ECE signals
 
@@ -270,7 +251,7 @@ class signal_ece(signal_2d):
                 Data time series for profiles. dim0: ECE channels. dim1: samples
     """
     def __init__(self, shotnr, t_params, 
-                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu",
+                 datapath="/projects/EKOLEMEN/d3d_loader", device="cpu",
                  channels=range(1,41)):
         """
         Unique part of constructor is channels. Can be any list of numbers from 1-40, or 
@@ -294,19 +275,17 @@ class signal_ece(signal_2d):
 
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_ece.h5")) 
-        tb = fp['ece']["xdata"][:] # Get time-base
-        
-        t_inds = self._get_time_sampling(tb)
+        for shot in self.shotnr:
+            fp = h5py.File(join(self.datapath, f"{shot}_ece.h5")) 
+            tb = torch.tensor(fp['tecef01']["xdata"][:]) # Get time-base
+            
+            t_inds = self._get_time_sampling(tb)
 
-        # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
-        prof_data = torch.tensor(np.stack([fp['ece'][f"tecef{channel:02d}"]
-                                        for channel in self.channels],
-                                        axis=1)[t_inds,:]
-                                    )
-        fp.close()
-
+            # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
+            prof_data = torch.tensor(np.stack([fp[f"tecef{channel:02d}"]
+                                            [t_inds] for channel in self.channels],
+                                            axis=1))
+            fp.close()
         elapsed = time.time() - t0_p
         logging.info(f"Loading raw ECE, t={self.tstart}-{self.tend}s took {elapsed}s")
         

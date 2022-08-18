@@ -21,7 +21,7 @@ class signal_1d():
 
     """
     def __init__(self, shotnr, t_params, 
-            datapath="/projects/EKOLEMEN/aza_lenny_data1",
+            datapath="/projects/EKOLEMEN/d3d_loader",
             device="cpu"):
         """Load data from HDF5 file, standardize, and move to device.
 
@@ -139,7 +139,7 @@ class signal_1d():
         # Load neutron data at t0 and t0 + 50ms. dt for this data is 50ms
         t0_p = time.time()
         # Don't use with... scope. This throws off dataloader
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_{self.file_label}.h5")) 
+        fp = h5py.File(join(self.datapath, f"{self.shotnr}.h5")) 
         # Checks to make sure predictor is present
         try:
             tb = torch.tensor(fp[self.key]["xdata"][:])
@@ -167,9 +167,21 @@ class signal_1d():
 
 
 class signal_pinj(signal_1d):
-    """Sum of total injected power."""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+    """Sum of total injected power.
+    
+        Args:
+        -----
+            name (str):
+            collect_keys (list(str))): List of datasets in the HDF5 file that will be summed to build the output signal.
+        
+
+        This signal is constructed by summing over a list of neutral beam injected power time
+        series. The list of signal over which we sum is given by the collect_keys argument.
+    """
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.name = 'pinj'
+        self.collect_keys = ["pinjf_15l", "pinjf_15r", "pinjf_21l", "pinjf_21r", 
+                             "pinjf_30l", "pinjf_30r", "pinjf_33l", "pinjf_33r"]
         super().__init__(shotnr, t_params, datapath, device)
     
     def _cache_data(self):
@@ -182,15 +194,12 @@ class signal_pinj(signal_1d):
         """
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        pinj_data = None
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_pinj.h5")) 
-        tb = fp["pinjf_15l"]["xdata"][:] # Get time-base
-
+        fp = h5py.File(join(self.datapath, f"{self.shotnr}.h5")) 
+        # Collect the time base using the 15l signal
+        tb = torch.tensor(fp["pinjf_15l"]["xdata"][:]) # Get time-base
         t_inds = self._get_time_sampling(tb)
-        if pinj_data == None:
-            pinj_data = sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in fp.keys()])
-        else:
-            pinj_data = torch.cat((pinj_data, sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in fp.keys()])), 0)
+        # Sum the contributions from all neutral beams specified in the collect_keys list.
+        pinj_data = sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in self.collect_keys])
         fp.close()
 
         elapsed = time.time() - t0_p
@@ -201,43 +210,75 @@ class signal_pinj(signal_1d):
 
 class signal_neut(signal_1d):
     "Neutrons rate 1d signal"
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "neutronsrate"
-        self.file_label = "profiles"
-        self.name = "neutron"
+        self.name = "neutronsrate"
         super().__init__(shotnr, t_params, datapath, device)
 
+
+class signal_iptipp(signal_1d):
+    "Target current"
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
+        self.key = "iptipp"
+        self.name = "iptipp"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
+class signal_dstenp(signal_1d):
+    "Target density"
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
+        self.key = "dstenp"
+        self.name = "dstenp"
+        super().__init__(shotnr, t_params, datapath, device)
+
+class signal_dssdenest(signal_1d):
+    "Line-averaged density"
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
+        self.key = "dssdenest"
+        self.name = "dssdenest"
+        super().__init__(shotnr, t_params, datapath, device)
 
 class signal_ip(signal_1d):
     "Injected power 1d signal"
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "ip"
-        self.file_label = "profiles"
         self.name = "ip"
         super().__init__(shotnr, t_params, datapath, device)
    
-    
+class signal_doutl(signal_1d):
+    """Lower triangularity shape profile"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
+        self.key = "doutl"
+        self.name = "lower triangularity"
+        super().__init__(shotnr, t_params, datapath, device)
+        
+
+class signal_doutu(signal_1d):
+    """Upper triangularity shape profile"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
+        self.key = "doutu"
+        self.name = "upper triangularity"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
 class signal_ech(signal_1d):
     "ECH 1d signal. Uses the corrected echpwrc pointname"
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "echpwrc"
-        self.file_label = "ech"
         self.name = "ECH"
         super().__init__(shotnr, t_params, datapath, device)
     
 class signal_q95(signal_1d):
     """q95 value - 1d signal"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "q95"
-        self.file_label = "profiles"
         self.name = "q95"
         super().__init__(shotnr, t_params, datapath, device)
     
     
 class signal_kappa(signal_1d):
     "Shape 1d signal Kappa"
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "kappa"
-        self.file_label = "shape"
         self.name = "kappa"
         super().__init__(shotnr, t_params, datapath, device)

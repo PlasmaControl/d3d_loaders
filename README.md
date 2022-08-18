@@ -1,10 +1,9 @@
 D3D Loaders
 ===========
 
-Implements data loader for D3D data. The loader itself is targeted to load data from the HDF5
-files compiled in `/projects/EKOLEMEN/aza_lenny_data1`. 
-Its structure is copied off of Pytorch's
-[Iterable Datasets](https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset)
+This package implements Pytorch-style [Iterable Datasets](https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset)
+for data downloaded from the D3D MDS server `atlas.gat.com`.
+The data is expected to be present as HDF5 files. A script to download relevant data is provided.
 
 Load Multiple Signals in Single Dataset
 ========
@@ -35,29 +34,33 @@ looking into the future to calculate our change in probability.
 They will be stored in the dictionaries `my_ds.predictors` and `my_ds.target`
 respectively. 
 
-Currently, the only target is `ae_prob_delta`, calculated using AE probabilities from Aza's RCN model. 
+Downloading signals
+===================
+MDS and PTDATA can be downloaded with the script `downloading.py`. This script fetches data for
+a given shot from D3D's MDSplus server and stores in in a HDF5 file.
+
 The current predictors are:
 
-| Predictor             | Key     |
-|-----------------------|---------|
-| AE Mode probabilities | ae_prob |
-| Pinj                  | pinj    |
-| Neutron Rate          | neut    |
-| Injected Power        | ip      |
-| ECH                   | ech     |
-| q95                   | q95     |
-| kappa                 | kappa   |
-| Density Profile       | dens    |
-| Pressure Profile      | pres    |
-| Temperature Profile   | temp    |
-| q Profile             | q       |
-| Lower Triangularity   | tri_l   |
-| Upper Triangularity   | tri_u   |
-| Raw ECE Channels      | raw_ece |
-| Raw CO2 dp Channels   | raw_co2_dp |
-| Raw CO2 pl Channels   | raw_co2_pl |
-| Raw MPI Channels      | raw_mpi |
-| Raw BES Channels      | raw_bes |
+| Predictor             | Key             |
+|-----------------------|-----------------|
+| AE Mode probabilities | ae_prob         |
+| Pinj                  | pinj            |
+| Neutron Rate          | neutronsrate    |
+| Injected Power        | ip              |
+| ECH                   | ech             |
+| q95                   | q95             |
+| kappa                 | kappa           |
+| Density Profile       | dens            |
+| Pressure Profile      | pres            |
+| Temperature Profile   | temp            |
+| q Profile             | q               |
+| Lower Triangularity   | doutl           |
+| Upper Triangularity   | doutl           |
+| Raw ECE Channels      | raw_ece         |
+| Raw CO2 dp Channels   | raw_co2_dp      |
+| Raw CO2 pl Channels   | raw_co2_pl      |
+| Raw MPI Channels      | raw_mpi         |
+| Raw BES Channels      | raw_bes         |
 | Bill's AE Labels (+-250ms window) | uci_label |
 
 NOTE: the shape signal of kappa and shape profiles of upper and lower triangularity don't have data even though
@@ -77,6 +80,8 @@ Out[119]:
 The first tensor has a number of elements fixed by the number of signals being used. 
 The order will match the order of the signals in `predictors`. 
 Each of these signals is normalized to their separate mean and standard deviation.
+
+Currently, the only target is `ae_prob_delta`, calculated using AE probabilities from Aza's RCN model. 
 The output tensor (2nd tensor) is the change in the Alfven Eigenmode probabilities over the interval given in
 `shift_targets` with the `ae_prob_delta` key,
 i.e. AE mode probability at t0 + 10ms as calculated using ECE data. This output is also
