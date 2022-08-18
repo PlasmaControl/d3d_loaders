@@ -267,7 +267,7 @@ class signal_ece(signal_2d):
 
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        fp = h5py.File(join(self.datapath, f"{self.shotnr}_ece.h5")) 
+        fp = h5py.File(join(self.datapath, 'template', f"{self.shotnr}_ece.h5")) 
         tb = fp['tecef01']["xdata"][:] # Get time-base
         
         t_inds = self._get_time_sampling(tb)
