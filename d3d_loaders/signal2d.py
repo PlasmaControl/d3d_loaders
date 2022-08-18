@@ -185,7 +185,7 @@ class signal_ae_prob(signal_2d):
 class signal_ae_prob_delta(signal_2d):
     """Change in Alfven Eigenmode probability over time""" 
     def __init__(self, shotnr, t_params, tshift=10,
-            datapath="/projects/EKOLEMEN/aza_lenny_data1",
+            datapath="/projects/EKOLEMEN/d3dloader",
             device="cpu"):
         """Construct difference in AE probability using two signal_ae_prob.
         
@@ -201,7 +201,7 @@ class signal_ae_prob_delta(signal_2d):
                   Desired sampling time, in milliseconds
         tshift : float, default=0.0
                  Shift signal by tshift with respect to tstart, in milliseconds
-        datapath : string, default='/projects/EKOLEMEN/aza_lenny_data1'
+        datapath : string, default='/projects/EKOLEMEN/d3dloader'
                    Basepath where HDF5 data is stored.  
         device : string, default='cpu'
                  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -226,11 +226,10 @@ class signal_ae_prob_delta(signal_2d):
         else:
             self.tshift = 0.0
         self.datapath = datapath
-
         self.data = ((signal_t1.data * signal_t1.data_std) + signal_t1.data_mean) - ((signal_t0.data * signal_t0.data_std) + signal_t0.data_mean) 
         self.data_mean = self.data.mean()
         self.data_std = self.data.std()
-        self.data = (self.data - self.data_mean) / self.data_std
+        self.data = (self.data - self.data_mean) / (self.data_std + 1e-10)
         logging.info(f"Compiled signal data for shot {shotnr}, mean={self.data_mean}, std={self.data_std}")
 
 
@@ -243,7 +242,7 @@ class signal_ece(signal_2d):
                 Data time series for profiles. dim0: ECE channels. dim1: samples
     """
     def __init__(self, shotnr, t_params, 
-                 datapath="/projects/EKOLEMEN/d3d_loader", device="cpu",
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu",
                  channels=range(1,41)):
         """
         Unique part of constructor is channels. Can be any list of numbers from 1-40, or 
@@ -267,17 +266,14 @@ class signal_ece(signal_2d):
 
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        for shot in self.shotnr:
-            fp = h5py.File(join(self.datapath, f"{shot}_ece.h5")) 
-            tb = torch.tensor(fp['tecef01']["xdata"][:]) # Get time-base
-            
-            t_inds = self._get_time_sampling(tb)
+        fp = h5py.File(join(self.datapath, f"{self.shotnr}.h5")) 
+        tb = torch.tensor(fp['tecef01']["xdata"][:]) # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
 
-            # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
-            prof_data = torch.tensor(np.stack([fp[f"tecef{channel:02d}"]
-                                            [t_inds] for channel in self.channels],
-                                            axis=1))
-            fp.close()
+        # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp[f"tecef{channel:02d}"]["zdata"][t_inds] for channel in self.channels], axis=1))
+        fp.close()
         elapsed = time.time() - t0_p
         logging.info(f"Loading raw ECE, t={self.tstart}-{self.tend}s took {elapsed}s")
         
@@ -294,7 +290,7 @@ class signal_co2_dp(signal_2d):
                 Data time series for profiles. dim0: co2 signals. dim1: samples
     """
     def __init__(self, shotnr, t_params, 
-                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu",
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu",
                  channels=['r0','v1','v2','v3']):
         """
         Unique part of constructor is channels. For CO2, it must be a subset (or default is all)
@@ -349,7 +345,7 @@ class signal_co2_pl(signal_2d):
                 Data time series for profiles. dim0: CO2 channels. dim1: samples
     """
     def __init__(self, shotnr, t_params, 
-                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu",
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu",
                  channels=['r0','v1','v2','v3']):
         """
         Unique part of constructor is channels. For CO2, it must be a subset (or default is all)
@@ -402,7 +398,7 @@ class signal_mpi(signal_2d):
                 Data time series for profiles. dim0: mpi66m angles. dim1: samples
     """
     def __init__(self, shotnr, t_params, 
-                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu",
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu",
                  angles=[67,97,127,157,247,277,307,340]):
         """
         Unique part of constructor is angles. Must be a subset (or the default all) 
@@ -455,7 +451,7 @@ class signal_BES(signal_2d):
                 Data time series for profiles. dim0: BES channels. dim1: samples
     """
     def __init__(self, shotnr, t_params, 
-                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu",
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu",
                  channels=range(1,65)):
         """
         Unique part of constructor is channels. Can be any list of numbers from 1-64, or 
@@ -480,7 +476,7 @@ class signal_BES(signal_2d):
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_BES.h5")) 
+        fp = h5py.File(join(self.datapath, f"{self.shotnr}_BES.h5")) 
         tb = fp["times"][:] # Get time-base
         
         t_inds = self._get_time_sampling(tb)
@@ -510,7 +506,7 @@ class signal_uci_label(signal_2d):
                 Order of AE modes is: BAAE, BAE, EAE, RSAE, TAE
     """
     def __init__(self, shotnr, t_params, 
-                 datapath="/projects/EKOLEMEN/aza_lenny_data1", device="cpu"):
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
         
         self.name = 'UCI approximate AE labels'
         super().__init__(shotnr, t_params, datapath, device)
@@ -527,7 +523,7 @@ class signal_uci_label(signal_2d):
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_uci_label.h5")) 
+        fp = h5py.File(join(self.datapath, f"{self.shotnr}_uci_label.h5")) 
         tb = fp["times"][:] # Get time-base
         
         t_inds = self._get_time_sampling(tb)

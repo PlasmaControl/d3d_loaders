@@ -44,7 +44,9 @@ profile_dict = {'Electron Density': {"Tree": "D3D", "Node": "ELECTRONS.PROFILE_F
 #   Tree - The name of the MDS tree the data is stored in
 #   Node - The name of the MDS node the data is stored in
 #   map_to - The group in the HDF5 file the data will be stored in
-scalars_dict = {"pinj": {"Tree": "D3D", "Node": "NB:PINJ", "map_to": "pinj"},
+scalars_dict = {"tinj": {"Tree": "D3D", "Node": "NB:TINJ", "map_to": "tinj"},
+                "pinj": {"Tree": "D3D", "Node": "NB:PINJ", "map_to": "pinj"},
+                "Total ECH power": {"Tree": "D3D", "Node": "RF.ECH.TOTAL.ECHPWRC", "map_to": "echpwrc"},
                 "pinjf_15l": {"Tree": "D3D", "Node": "NB.NB15L:PINJF_15L", "map_to": "pinjf_15l"},
                 "pinjf_15r": {"Tree": "D3D", "Node": "NB.NB15R:PINJF_15R", "map_to": "pinjf_15r"},
                 "pinjf_21l": {"Tree": "D3D", "Node": "NB.NB21L:PINJF_21L", "map_to": "pinjf_21l"},
@@ -105,7 +107,7 @@ scalars_dict = {"pinj": {"Tree": "D3D", "Node": "NB:PINJ", "map_to": "pinj"},
 #   Node - The name of the MDS node the data is stored in
 #   map_to - The group in the HDF5 file the data will be stored in
 scalars_pt = {"Target current": {"Node": r"\iptipp", "map_to": "iptipp"},
-              "Target density": {"Node": r"\dstdenp", "map_to": "dstenp"},
+              "Target density": {"Node": r"\dstdenp", "map_to": "dstdenp"},
               "line-averaged density": {"Node": r"\dssdenest", "map_to": "dssdenest"}}
 
 
@@ -120,13 +122,23 @@ logging.basicConfig(filename=log_fname,
 
 conn = mds.Connection("atlas.gat.com")
 
-with h5py.File(join(data_path, f"{shotnr}.h5"), "w") as df:
+# File mode needs to be append! Otherwise we delete the file contents every time we
+# execute this script.
+with h5py.File(join(data_path, f"{shotnr}.h5"), "a") as df:
+    assert(df.mode == "r+")
     # Handle each of the three data kinds separately.
     # First profile data
     for key in profile_dict.keys():
-        
         tree = profile_dict[key]["Tree"]
         node = profile_dict[key]["Node"]
+        map_to = profile_dict[key]["map_to"]
+
+        try:
+            if df[map_to]["zdata"].size > 0:
+                logging.info(f"Signal {map_to} already exists. Skipping download")
+                continue
+        except KeyError as err:
+            pass
 
         try:
             logging.info(f"Trying to download {tree}::{node} from MDS")
@@ -152,7 +164,7 @@ with h5py.File(join(data_path, f"{shotnr}.h5"), "w") as df:
             continue
         # The data is downloaded now. Next store them in HDF5
         try:
-            grp = df.create_group(f"{profile_dict[key]['map_to']}")
+            grp = df.create_group(map_to)
             grp.attrs.create("origin", f"MDS {tree}::{node}")
             # Store data in arrays and set units as an attribute
             for ds_name, ds_data, u_name, u_data in zip(["xdata", "ydata", "zdata"],
@@ -168,13 +180,23 @@ with h5py.File(join(data_path, f"{shotnr}.h5"), "w") as df:
             raise(err)
         
         logging.info(f"Stored {tree}::{node} into {grp}")
+
     # Second scalar data
     for key in scalars_dict.keys():
+        tree = scalars_dict[key]["Tree"]
+        node = scalars_dict[key]["Node"]
+        map_to = scalars_dict[key]["map_to"]
+
+        # Skip the download if there already is data in the HDF5 file
+        try:
+            if df[map_to]["zdata"].size > 0:
+                logging.info(f"Signal {map_to} already exists. Skipping download")
+                continue
+        except KeyError:
+            pass
+
         try:
             logging.info(f"Trying to download {tree}::{node} from MDS")
-            tree = scalars_dict[key]["Tree"]
-            node = scalars_dict[key]["Node"]
-
             conn.openTree(tree, shotnr)
 
             zdata = conn.get(f"_s ={node}").data()
@@ -190,7 +212,7 @@ with h5py.File(join(data_path, f"{shotnr}.h5"), "w") as df:
         
         # Data is now downloaded. Store them in HDF5
         try:
-            grp = df.create_group(f"{scalars_dict[key]['map_to']}")
+            grp = df.create_group(map_to)
             grp.attrs.create("origin", f"MDS {tree}::{node}")
             # Store data in arrays and set units as an attribute
             for ds_name, ds_data, u_name, u_data in zip(["xdata", "zdata"],
@@ -207,8 +229,17 @@ with h5py.File(join(data_path, f"{shotnr}.h5"), "w") as df:
         logging.info(f"Stored {tree}::{node} into {grp}")
 
     # Finally PTDATA
-    for key, val in scalars_pt.items():
-        node = val['Node']
+    for key in scalars_pt.keys():
+        node = scalars_pt[key]["Node"]
+        map_to = scalars_pt[key]["map_to"]
+        # Skip the download if there already is data in the HDF5 file
+        try:
+            if df[map_to]["zdata"].size > 0:
+                logging.info(f"Signal {map_to} already exists. Skipping download")
+                continue
+        except KeyError:
+            pass
+
         try:
             logging.info(f"Trying to download {node} from PTDATA")
             zdata = conn.get(f"_s = ptdata2('{node}', {shotnr})").data()
@@ -231,7 +262,7 @@ with h5py.File(join(data_path, f"{shotnr}.h5"), "w") as df:
             logging.error(f"Failed to write {node} to HDF5 group {grp} - {err}")
             raise(err)
         
-        logging.info(f"Stored PTDATA {node} into {grp}")        
+        logging.info(f"Stored PTDATA {node} into {grp}")
 
 
 # end of file downloading.py

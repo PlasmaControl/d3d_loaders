@@ -89,11 +89,14 @@ class D3D_dataset(torch.utils.data.Dataset):
             except:
                 t_shift = 0.0
             t_params_key["t_shift"] = t_shift
-            
             # Load Signal
             if pred_name == "pinj":
                 logging.info(f"Adding pinj to predictor list.")
                 self.predictors["pinj"] = signal_pinj(shotnr, t_params_key, datapath=self.datapath, device=device)
+
+            elif pred_name == "tinj":
+                logging.info(f"Adding pinj to predictor list.")
+                self.predictors["tinj"] = signal_pinj(shotnr, t_params_key, datapath=self.datapath, device=device)
 
             elif pred_name == "ae_prob":
                 logging.info(f"Adding ae_prob to predictor list.")
@@ -113,16 +116,20 @@ class D3D_dataset(torch.utils.data.Dataset):
 
             elif pred_name == "dstdenp":
                 logging.info(f"Adding target density to predictor list.")
-                self.predictors["dstenp"] = signal_dstenp(shotnr, t_params_key, datapath=self.datapath, device=device)
+                self.predictors["dstdenp"] = signal_dstdenp(shotnr, t_params_key, datapath=self.datapath, device=device)
 
             elif pred_name == "dssdenest":
                 logging.info("Adding line-averaged density to predictor list")
                 self.predictors["dssdenest"] = signal_dssdenest(shotnr, t_params_key, datapath=self.datapath, device=device)
 
-            elif pred_name == "ech":
+            elif pred_name == "echpwrc":
                 logging.info(f"Adding ECH to predictor list.")         
-                self.predictors["ech"] = signal_ech(shotnr, t_params_key, datapath=self.datapath, device=device)
-            
+                self.predictors["echpwrc"] = signal_ech(shotnr, t_params_key, datapath=self.datapath, device=device)
+
+            elif pred_name == "ali":
+                logging.info(f"Adding Internal inductance to predictor list.")         
+                self.predictors["ali"] = signal_ech(shotnr, t_params_key, datapath=self.datapath, device=device)
+
             elif pred_name == "q95":
                 logging.info(f"Adding q95 to predictor list.")         
                 self.predictors["q95"] = signal_q95(shotnr, t_params_key, datapath=self.datapath, device=device)
@@ -190,13 +197,12 @@ class D3D_dataset(torch.utils.data.Dataset):
                 raise(ValueError(f'{pred_name} is not a valid predictor'))
             
 
-
         for target_name in targets:
             t_params_key = t_params.copy()
-            try:
-                t_shift = self.shift_target[target_name]
-            except:
-                t_shift = 0.0 
+            #try:
+                t_shift = self.shift_targets[target_name]
+            #except KeyError:
+            #   t_shift = 0.0 
             
             if target_name == "ae_prob_delta":
                 logging.info(f"Adding ae_prob_delta to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              

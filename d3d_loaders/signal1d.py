@@ -65,7 +65,7 @@ class signal_1d():
         # Z-score normalization
         self.data_mean = self.data.mean()
         self.data_std = self.data.std()
-        self.data = (self.data - self.data_mean) / self.data_std
+        self.data = (self.data - self.data_mean) / (self.data_std + 1e-10)
         logging.info(f"""Compiled signal {self.__class__.__name__}, 
                          tstart={self.tstart}, tend={self.tend}, tsample={self.tsample}, tshift={self.tshift},
                          datapath={self.datapath}, 
@@ -208,8 +208,16 @@ class signal_pinj(signal_1d):
         return pinj_data.unsqueeze(1)
 
 
+class signal_tinj(signal_1d):
+    """Injected torque"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
+        self.key = "tinj"
+        self.name = "tinj"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
 class signal_neut(signal_1d):
-    "Neutrons rate 1d signal"
+    """Neutrons rate 1d signal"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "neutronsrate"
         self.name = "neutronsrate"
@@ -217,41 +225,44 @@ class signal_neut(signal_1d):
 
 
 class signal_iptipp(signal_1d):
-    "Target current"
+    """Target current"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "iptipp"
         self.name = "iptipp"
         super().__init__(shotnr, t_params, datapath, device)
 
 
-class signal_dstenp(signal_1d):
-    "Target density"
+class signal_dstdenp(signal_1d):
+    """Target density"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "dstenp"
-        self.name = "dstenp"
+        self.key = "dstdenp"
+        self.name = "dstdenp"
         super().__init__(shotnr, t_params, datapath, device)
 
+
 class signal_dssdenest(signal_1d):
-    "Line-averaged density"
+    """Line-averaged density"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "dssdenest"
         self.name = "dssdenest"
         super().__init__(shotnr, t_params, datapath, device)
 
+
 class signal_ip(signal_1d):
-    "Injected power 1d signal"
+    """Injected power 1d signal"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "ip"
         self.name = "ip"
         super().__init__(shotnr, t_params, datapath, device)
-   
+
+
 class signal_doutl(signal_1d):
     """Lower triangularity shape profile"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "doutl"
         self.name = "lower triangularity"
         super().__init__(shotnr, t_params, datapath, device)
-        
+
 
 class signal_doutu(signal_1d):
     """Upper triangularity shape profile"""
@@ -262,12 +273,13 @@ class signal_doutu(signal_1d):
 
 
 class signal_ech(signal_1d):
-    "ECH 1d signal. Uses the corrected echpwrc pointname"
+    """ECH 1d signal. Uses the corrected echpwrc pointname"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "echpwrc"
         self.name = "ECH"
         super().__init__(shotnr, t_params, datapath, device)
-    
+
+
 class signal_q95(signal_1d):
     """q95 value - 1d signal"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
@@ -277,7 +289,7 @@ class signal_q95(signal_1d):
     
     
 class signal_kappa(signal_1d):
-    "Shape 1d signal Kappa"
+    """Shape 1d signal Kappa"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "kappa"
         self.name = "kappa"
