@@ -526,8 +526,7 @@ class signal_uci_label(signal_2d):
         self.data = self._cache_data().to(device)
         logging.info(f"""Compiled signal {self.__class__.__name__}, 
                          tstart={self.tstart}, tend={self.tend}, tsample={self.tsample}, tshift={self.tshift},
-                         datapath={self.datapath}, 
-                         mean={self.data_mean}, std={self.data_std}""")
+                         datapath={self.datapath}""")
         
     def _cache_data(self):
         """Load 2d profile from hdf5 data file.
