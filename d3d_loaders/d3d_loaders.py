@@ -206,6 +206,10 @@ class D3D_dataset(torch.utils.data.Dataset):
                 logging.info(f"Adding uci_label to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              
                 self.targets["uci_label"] = signal_uci_label(shotnr, t_params_key, datapath=datapath, device=device)
  
+            elif target_name == "uci_label_relaxed":
+                logging.info(f"Adding uci_label_relaxed to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              
+                self.targets["uci_label_relaxed"] = signal_uci_label_relaxed(shotnr, t_params_key, datapath=datapath, device=device)
+    
             # Add other targets here
             else:
                 raise(ValueError(f'{target_name} is not a valid target'))
