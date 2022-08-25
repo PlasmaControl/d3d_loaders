@@ -584,7 +584,7 @@ class signal_uci_label_relaxed(signal_uci_label):
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         
-        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_uci_label_relaxed.h5")) 
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_uci_relaxed.h5")) 
         tb = fp["times"][:] # Get time-base
         
         t_inds = self._get_time_sampling(tb)
