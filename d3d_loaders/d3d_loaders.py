@@ -69,6 +69,7 @@ class D3D_dataset(torch.utils.data.Dataset):
         self.tend = t_params["tend"]
         self.tsample = t_params["tsample"]
         self.shift_targets = shift_targets
+        self.device = device
 
         logging.info(f"Using device {device}")
 
@@ -80,7 +81,6 @@ class D3D_dataset(torch.utils.data.Dataset):
         self.targets = {}
 
         # Initialize all predictors
-        logging.info(f"t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms")         
         for pred_name in predictors:
             # Get t_shift from shift_target
             t_params_key = t_params.copy()
@@ -199,18 +199,19 @@ class D3D_dataset(torch.utils.data.Dataset):
 
         for target_name in targets:
             t_params_key = t_params.copy()
-            #try:
-                t_shift = self.shift_targets[target_name]
-            #except KeyError:
-            #   t_shift = 0.0 
             
             if target_name == "ae_prob_delta":
+                t_params_key["tshift"] = shift_targets[target_name]
                 logging.info(f"Adding ae_prob_delta to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              
-                self.targets["ae_prob_delta"] = signal_ae_prob_delta(shotnr, t_params_key, t_shift, datapath=datapath, device=device)
+                self.targets["ae_prob_delta"] = signal_ae_prob_delta(shotnr, t_params_key, datapath=self.datapath, device=device)
             
             elif target_name == "uci_label":
                 logging.info(f"Adding uci_label to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              
-                self.targets["uci_label"] = signal_uci_label(shotnr, t_params_key, datapath=datapath, device=device)
+                self.targets["uci_label"] = signal_uci_label(shotnr, t_params_key, datapath=self.datapath, device=device)
+
+            elif target_name == "ae_prob":
+                logging.info(f"Adding ae_prob_delta to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_shift}")              
+                self.targets["ae_prob"] = signal_ae_prob(shotnr, t_params_key, datapath=self.datapath, device=device)
  
             # Add other targets here
             else:

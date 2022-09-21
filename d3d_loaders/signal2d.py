@@ -184,7 +184,7 @@ class signal_ae_prob(signal_2d):
 
 class signal_ae_prob_delta(signal_2d):
     """Change in Alfven Eigenmode probability over time""" 
-    def __init__(self, shotnr, t_params, tshift=10,
+    def __init__(self, shotnr, t_params, 
             datapath="/projects/EKOLEMEN/d3dloader",
             device="cpu"):
         """Construct difference in AE probability using two signal_ae_prob.
@@ -214,7 +214,7 @@ class signal_ae_prob_delta(signal_2d):
         # Signal at t0
         signal_t0 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
         # Shifted signal
-        t_params['tshift'] = tshift
+        #t_params['tshift'] = tshift
         signal_t1 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
     
         self.shotnr = shotnr
