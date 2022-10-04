@@ -63,8 +63,8 @@ class signal_1d():
         # Load data from HDF5 file and store, move to device
         self.data = self._cache_data().to(device)
         # Z-score normalization
-        # self.data_mean = self.data.mean()
-        # self.data_std = self.data.std()
+        self.data_mean = self.data.mean()
+        self.data_std = self.data.std()
         # self.data = (self.data - self.data_mean) / self.data_std
         logging.info(f"""Compiled signal {self.__class__.__name__}, 
                          tstart={self.tstart}, tend={self.tend}, tsample={self.tsample}, tshift={self.tshift},
