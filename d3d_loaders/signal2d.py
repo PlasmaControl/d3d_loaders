@@ -282,8 +282,8 @@ class signal_ece(signal_2d):
         # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
         
         # Normalize
-        mean = -0.002892238254443866
-        std = 0.03397498393550061
+        mean = 0.0
+        std = 1.0
         return (prof_data - mean) / std
 
 
@@ -337,8 +337,8 @@ class signal_co2_dp(signal_2d):
         logging.info(f"Loading raw CO2 dp, t={self.tstart}-{self.tend}s took {elapsed}s")
         
         # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
-        mean = -44.480515444278716
-        std = 139.05041297883912
+        mean = 0.0
+        std = 1.0
         return (prof_data - mean) / std
 
 
@@ -413,7 +413,7 @@ class signal_mpi(signal_2d):
         of the following angles: 
         """
         self.angles = angles
-        self.name = 'raw ece'
+        self.name = 'raw mpi'
         super().__init__(shotnr, t_params, datapath, device)
         
     def _cache_data(self):
@@ -447,8 +447,8 @@ class signal_mpi(signal_2d):
         logging.info(f"Loading raw MPI, t={self.tstart}-{self.tend}s took {elapsed}s")
         
         # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
-        mean = -0.014461191272219329
-        std = 0.08025397867197163
+        mean = 0.0
+        std = 1.0
         return (prof_data - mean) / std
 
 
