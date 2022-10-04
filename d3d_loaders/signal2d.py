@@ -41,7 +41,7 @@ class signal_2d(signal_1d):
 
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        fp = h5py.File(join(self.datapath, f"{shotnr}.h5")) 
+        fp = h5py.File(join(self.datapath, f"{self.shotnr}.h5")) 
         try:
             tb = fp[self.key]["xdata"][:] # Get time-base
         except ValueError as e:
