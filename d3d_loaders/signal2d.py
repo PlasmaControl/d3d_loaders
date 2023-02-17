@@ -162,9 +162,11 @@ class signal_ae_prob(signal_2d):
         # Initialize to zero, overwrite in for loop
         r_prev = {"layer1": np.zeros(self.n_res_l1),
                   "layer2": np.zeros(self.n_res_l2)} 
+        #print(ece_data.shape)
         # Iterate over time index 0
         for idx, u in enumerate(ece_data):
             L = "layer1"
+            #print(idx, u.shape)
             r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
                                      self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
                                      self.infer_data[L]['leak_rate'], r_prev[L], u.T)
