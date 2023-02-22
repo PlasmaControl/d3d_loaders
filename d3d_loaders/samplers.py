@@ -7,6 +7,7 @@
 import torch
 from torch.utils.data import SequentialSampler, BatchSampler, RandomSampler, Sampler
 from typing import Sequence, Iterator
+import random
 import logging
 
 class RandomSequenceSampler(Sampler[int]):
@@ -78,9 +79,11 @@ class RandomBatchSequenceSampler(Sampler[int]):
     def __iter__(self) -> Iterator[int]:
         """Returns a batch of fixed length sequences, starting at random."""
         # Define random starting indices of the sequence
-        idx_permuted = torch.randperm(len(self.indices) - self.seq_length)
-        print(f"idx_permuted = {idx_permuted}, size = {idx_permuted.shape}")
-        print(f"batch_size = {self.batch_size}")
+        # idx_permuted = torch.randperm(len(self.indices) - self.seq_length)
+        # print(f"idx_permuted = {idx_permuted}, size = {idx_permuted.shape}")
+        # print(f"batch_size = {self.batch_size}")
+        idx_permuted = list(range(len(self.indices) - self.seq_length))
+        random.shuffle(idx_permuted)
         # Number of batches to draw. Round up.
         num_batches = (len(self.indices) - self.seq_length) // self.batch_size
         for ix_b in range(0, num_batches):
@@ -88,7 +91,8 @@ class RandomBatchSequenceSampler(Sampler[int]):
             ix_start = idx_permuted[(ix_b * self.batch_size):((ix_b + 1) * self.batch_size)]
             # Return a list of tensors, so that the entire tensor is passed to dataset.__idx__:
             # See call for map-style datasets in code example here: https://pytorch.org/docs/stable/data.html#automatic-batching-default
-            yield [torch.cat([torch.arange(i, i + self.seq_length + 1) for i in ix])]
+            yield [torch.cat([torch.arange(i, i + self.seq_length + 1) for i in ix_start])]
+
 
 class SequentialSequenceSampler(Sampler[int]):
     r"""Samples sequences randomly, without replacement.
@@ -147,8 +151,14 @@ class SequentialSequenceSampler(Sampler[int]):
 
 
 
-def collate_fn_batched(ll, seq_length):
-
+class collate_fn_random_batch_seq():
+    def __init__(self, batch_size):
+        self.batch_size = batch_size
+        
+    def __call__(self, x):
+        x = x[0]
+        #print(f"__call__ len(x) = {len(x)}, type(x[0]) = {type(x[0])}, x[0].shape = {x[0].shape}")
+        return x[0].reshape(self.batch_size, -1, x[0].shape[-1]), x[1].reshape(self.batch_size, -1, x[1].shape[-1])
 
 def collate_fn_randseq(ll, seq_length):
     """Works in combination with RandomSequenceSampler.
@@ -204,5 +214,58 @@ def collate_fn_randseq(ll, seq_length):
     y = torch.cat([ll[idx][1].unsqueeze(0) for idx in y_list_idx], dim=0).unsqueeze(0)
    
     return x, y
+
+
+class RandomBatchSequenceSampler_multishot():
+    r"""Randomly samples batched sequences from multi-shot dataset without replacement.
+    
+    Works similar to RandomBatchSequenceSampler, but spreads sampling out over multiple datasets.
+    As of now (2023-02), all datasets have to have the same length.
+    
+    Args:
+        num_shots: Number of shots in the dataset
+        num_elements: Elements per dataset. All have equal size
+        seq_length: Length of sequences to sample
+        batch_size: Number of sequences to return per iteration.
+
+    """
+
+    #indices: Sequence[int]
+
+    def __init__(self, num_shots:int, num_elements: int, seq_length: int, batch_size: int) -> None:
+        self.num_shots = num_shots
+        self.indices = range(num_elements)
+        self.seq_length = seq_length
+        self.batch_size = batch_size
+        
+        # print(f"__init__() indices={self.indices}, seq_length={self.seq_length}, batch_size={self.batch_size}")
+
+        if self.batch_size >= num_elements:
+            raise ValueError("Batch size must be smaller than the size of the dataset. ")
+
+    def __iter__(self): # -> Iterator[int]:
+        """Returns a batch of fixed length sequences, starting at random."""
+        # Randomly shuffle starting indices for each shot
+        idx_permuted = [(s, i) for i in range(len(self.indices) - self.seq_length) for s in range(self.num_shots)]
+        random.shuffle(idx_permuted)
+
+        # Number of batches to draw. Round up.
+        num_batches = self.num_shots * (len(self.indices) - self.seq_length) // self.batch_size
+        for ix_b in range(0, num_batches):
+            # Select starting points for sequences
+            print(idx_permuted[ix_b:ix_b+3])
+            selected = idx_permuted[(ix_b * self.batch_size):((ix_b + 1) * self.batch_size)]
+            yield [(s[0], range(s[1], s[1] + self.seq_length + 1)) for s in selected]
+
+
+class collate_fn_random_batch_seq_multi():
+    r"""Stacks samples from RandomBatchSequenceSampler_multishot into single tensors."""
+    def __init__(self, batch_size):
+        self.batch_size = batch_size
+        
+    def __call__(self, samples):
+        x_stacked = torch.cat([s[0][:, None, :] for s in samples], dim=1)
+        y_stacked = torch.cat([s[1][:, None, :] for s in samples], dim=1)
+        return x_stacked, y_stacked
 
 # end of file samplers.py

@@ -250,6 +250,8 @@ class D3D_dataset(torch.utils.data.Dataset):
    
     def __getitem__(self, idx):
         """Fetch data corresponding to the idx'th sample.
+
+        Use RandomBatchSequenceSampler in combination with torch.DataLoader for sampling from this dataset.
         
         Returns
         -------
@@ -264,5 +266,70 @@ class D3D_dataset(torch.utils.data.Dataset):
         data_t1 = torch.cat([t.data[idx, :] for t in self.targets.values()], dim=-1)
 
         return data_t0, data_t1
-#
+
+
+class Multishot_dataset():
+    r"""Multishot dataset is a wrapper for a dataset consisting of multiple shots.
+    
+    It's basically a list of D3D_datasets. But the __getindex__ function is smart,
+    mapping a sequential index onto individual member datasets.
+
+    Example use-case
+
+    >>> shot_list_train = [172337, 172339] 
+    >>> tstart = 110.0 # Time of first sample for upper triangularity is 100.0
+    >>> tend = 2000.0
+    >>> t_params = {"tstart": tstart, "tend": tend, "tsample": 1.0}
+    >>> t_shift = 10.0
+    >>> device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    >>> seq_length = 512
+    >>> batch_size = 4
+    >>> pred_list = ["pinj", "tinj", "ae_prob"]
+    >>> targ_list = ["ae_prob"]
+    >>> ds_train = Multishot_dataset(shot_list_train, t_params, pred_list, targ_list, {"ae_prob": t_shift}, "/projects/EKOLEMEN/d3dloader/test", device)
+    >>> loader_train_b = torch.utils.data.DataLoader(ds_train, num_workers=0, 
+    >>>                                              batch_sampler=RandomBatchSequenceSampler_multids(2, len(ds_train.datasets[0]), seq_length, batch_size),
+    >>>                                              collate_fn = collate_fn_random_batch_seq_multi(batch_size))
+    >>> for xb, yb in loader_train_b:
+            print(xb.shape, yb.shape)
+            break
+    torch.Size([513, 4, 7]) torch.Size([513, 4, 5])
+
+    
+    Args:
+        shotlist
+        t_params
+        predictors
+        targets
+        shift_targets
+        datapath
+        device
+    """
+
+    
+   
+    def __init__(self, shotlist, t_params, predictor, targets, shift_targets, datapath, device):
+        # Create list of D3D_datasets
+        self.datasets = [D3D_dataset(shotnr, t_params, predictor, targets, shift_targets, datapath, device) for shotnr in shotlist]
+        #self.cumulative_sizes = self.cumsum([len(ds) for ds in self.datasets])
+        
+    def shot(self, idx: int):
+        r"""Quick access to individual shot"""
+        return self.datasets[idx]
+        
+    def __getitem__(self, idx):
+        """Fetch data from random dataset.
+        
+        This method uses tuple indices, idx=(ix_ds, ix_sample), where `ix_ds` is an int that specifies the shot
+        and `ix_sample` denotes the samples for the specified shot. Each shot has zero-based indices.
+        
+        Args:
+            idx: Either tuple(int, range), or list[tuple(int, range)]. int specifies the shot and range the
+                 idx passed to D3D_dataset.__getitem__.
+        """
+        if isinstance(idx, list):
+            return [self.datasets[i[0]][i[1]] for i in idx]
+        elif isinstance(idx, tuple):
+            return self.datasets[idx[0]][idx[1]]
+
 # End of file d3d_loaders.py
