@@ -195,14 +195,19 @@ class signal_ae_prob_delta(signal_2d):
         ----------
         shotnr : Int
                  Shot number
-        tstart : float
-                 Start of signal interval, in milliseconds
-        tend : float
-               End of signal interval, in milliseconds
-        tsample : float
-                  Desired sampling time, in milliseconds
-        tshift : float, default=0.0
-                 Shift signal by tshift with respect to tstart, in milliseconds
+        t_params: dict
+                  Contains the following necessary keys:
+                 
+                    tstart : float
+                             Start of signal interval, in milliseconds
+                    tend : float
+                           End of signal interval, in milliseconds
+                    tsample : float
+                              Desired sampling time, in milliseconds
+                                    
+                  Optional keys/arguments:
+                    tshift : float, default=0.0
+                             Shift signal by tshift with respect to tstart, in milliseconds
         datapath : string, default='/projects/EKOLEMEN/d3dloader'
                    Basepath where HDF5 data is stored.  
         device : string, default='cpu'
@@ -213,25 +218,28 @@ class signal_ae_prob_delta(signal_2d):
         """
         self.name = 'ae_prob_delta'
         
-        # Signal at t0
-        signal_t0 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
-        # Shifted signal
-        #t_params['tshift'] = tshift
-        signal_t1 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
-    
+
+
+
         self.shotnr = shotnr
         self.tstart = t_params["tstart"]
         self.tend = t_params["tend"]
         self.tsample = t_params["tsample"]
-        if "tshift" in list(t_params.keys()):
-            self.tshift = t_params["tshift"]
-        else:
-            self.tshift = 0.0
+        if("tshift" not in t_params.keys()):
+            raise(KeyError("dictionary key 'tshift' not found when constructing `signal_ae_prob_delta`"))
+
         self.datapath = datapath
         self.data = ((signal_t1.data * signal_t1.data_std) + signal_t1.data_mean) - ((signal_t0.data * signal_t0.data_std) + signal_t0.data_mean) 
         self.data_mean = self.data.mean()
         self.data_std = self.data.std()
         self.data = (self.data - self.data_mean) / (self.data_std + 1e-10)
+
+        # Shifted signal
+        signal_t1 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
+        # Signal at t0, set t_shift = 0
+        t_params["tshift"] = 0.0
+        signal_t0 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
+
         logging.info(f"Compiled signal data for shot {shotnr}, mean={self.data_mean}, std={self.data_std}")
 
 

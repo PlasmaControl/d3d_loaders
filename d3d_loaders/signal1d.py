@@ -81,7 +81,7 @@ class signal_1d():
         Parameters
         ----------
         tb : float array
-                time base array, the true time of each measurement
+                time base array, the time each sample corresponds to.
         
         Returns
         -------
@@ -99,19 +99,25 @@ class signal_1d():
         # Forced sampling times
         time_samp_vals = np.arange(self.tstart, self.tend, self.tsample)
         
-        # Shift times
-        time_samp_vals += self.tshift
+        # Shift times. To have samples at a future time (shifted by tshift) line up
+        # at the same index as the unshifted time, we need to subtract the time shift
+        # from the time-base.
         
+
+        time_samp_vals -= self.tshift
+        if self.tshift > 0.0:
+            logging.info(f"shifted time_samp_vals = {time_samp_vals}")
+
         tb_ind = 1 # Index of time in tb
         num_samples = len(time_samp_vals)
         t_inds = np.zeros((num_samples,), dtype=int)
         
         # Raise error if first time sample comes before first measurement
         if tb[0] > time_samp_vals[0]:
-            raise(ValueError(f'Time of first sample is before first real measurement was taken for {self.name}'))
+            raise(ValueError(f'Time of first requested sample is before first real measurement was taken for {self.name}'))
         
         for i, time_samp in enumerate(time_samp_vals):
-            # Increase tb_ind until the real time is past our sampling time
+            # Scan the signals time_base as long as we are below the next desired sampling time
             while tb[tb_ind] < time_samp and tb_ind < len(tb) - 1:
                 tb_ind += 1
             

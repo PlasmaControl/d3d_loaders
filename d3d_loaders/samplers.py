@@ -7,6 +7,7 @@
 import torch
 from torch.utils.data import SequentialSampler, BatchSampler, RandomSampler, Sampler
 from typing import Sequence, Iterator
+import logging
 
 class RandomSequenceSampler(Sampler[int]):
     r"""Samples sequences randomly, without replacement.
@@ -16,26 +17,18 @@ class RandomSequenceSampler(Sampler[int]):
     (N - seq_length - 1) sequences is random.
     
     # Generate sequences of length 3, as to cover [0, 1, 2, 3, 4, 5]
-    >>> rs = RandomSequenceSampler([0, 1, 2, 3, 4, 5], 2)
+    >> torch.manual_seed(1337)
+    >>> rs = RandomSequenceSampler(5, 2)
     >>> for item in rs:
             print(item)
-    3
-    4
-    5
-    0
-    1
-    2
-    2
-    3
-    4
-    1
-    2
-    3
 
-    In the output above, the first sequence of length (2 + 1) starts at 3: [3, 4, 5].
-    The second sequence of length (2 + 1) starts at 0: [0, 1, 2].
-    The third sequence of length (2 + 1) starts at 2: [2, 3, 4].
-    And the fourth sequence of length (2 + 1) starts at 1: [1, 2, 3].
+    range(1, 4)
+    range(2, 5)
+    range(0, 3)
+
+    In the output above, the first sequence of length (2 + 1) covers items 1, 2, 3 = range(1, 4)
+    The second sequence of length (2 + 1) covers items 2, 3, 4 = range(2, 5)
+    The third sequence of length (2 + 1) covers items 0, 1, 2 = range(0, 3)
     
     Thus, we have exhausted the possibility of many-to-one mappings of the kind:
     
@@ -43,12 +36,13 @@ class RandomSequenceSampler(Sampler[int]):
     
     
     Args:
+        num_elements: Length of the dataset
         seq_length: Length of the desired sequence
     """
     indices: Sequence[int]
         
-    def __init__(self, indices: Sequence[int], seq_length: int) -> None:
-        self.indices = indices
+    def __init__(self, num_elements: int, seq_length: int) -> None:
+        self.indices = range(num_elements)
         self.seq_length = seq_length
         
     def __iter__(self) -> Iterator[int]:
@@ -58,13 +52,43 @@ class RandomSequenceSampler(Sampler[int]):
         for start in torch.randperm(len(self.indices) - self.seq_length):
             #print("start_idx = ", start)
             # The yield seq_length successive indices
-            for seq_idx in self.indices[start:start+self.seq_length + 1]:
-                #print(f"--seq_idx = {seq_idx}")
-                yield seq_idx
+            yield self.indices[start:start+self.seq_length + 1]
             
     def __len__(self) -> int:
         return len(self.indices)
 
+
+class RandomBatchSequenceSampler(Sampler[int]):
+    r"""Randomly samples batched sequences without replacement.
+
+    """
+
+    indices: Sequence[int]
+
+    def __init__(self, num_elements: int, seq_length: int, batch_size: int) -> None:
+        self.indices = range(num_elements)
+        self.seq_length = seq_length
+        self.batch_size = batch_size
+        
+        print(f"__init__() indices={self.indices}, seq_length={self.seq_length}, batch_size={self.batch_size}")
+
+        if self.batch_size >= num_elements:
+            raise ValueError("Batch size must be smaller than the size of the dataset. ")
+
+    def __iter__(self) -> Iterator[int]:
+        """Returns a batch of fixed length sequences, starting at random."""
+        # Define random starting indices of the sequence
+        idx_permuted = torch.randperm(len(self.indices) - self.seq_length)
+        print(f"idx_permuted = {idx_permuted}, size = {idx_permuted.shape}")
+        print(f"batch_size = {self.batch_size}")
+        # Number of batches to draw. Round up.
+        num_batches = (len(self.indices) - self.seq_length) // self.batch_size
+        for ix_b in range(0, num_batches):
+            # draw (batch_size) starting indices
+            ix_start = idx_permuted[(ix_b * self.batch_size):((ix_b + 1) * self.batch_size)]
+            # Return a list of tensors, so that the entire tensor is passed to dataset.__idx__:
+            # See call for map-style datasets in code example here: https://pytorch.org/docs/stable/data.html#automatic-batching-default
+            yield [torch.cat([torch.arange(i, i + self.seq_length + 1) for i in ix])]
 
 class SequentialSequenceSampler(Sampler[int]):
     r"""Samples sequences randomly, without replacement.
@@ -120,6 +144,10 @@ class SequentialSequenceSampler(Sampler[int]):
             
     def __len__(self) -> int:
         return len(self.indices)
+
+
+
+def collate_fn_batched(ll, seq_length):
 
 
 def collate_fn_randseq(ll, seq_length):
