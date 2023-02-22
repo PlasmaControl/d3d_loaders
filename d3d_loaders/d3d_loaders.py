@@ -261,7 +261,6 @@ class D3D_dataset(torch.utils.data.Dataset):
                   Concatenated targets. dim0: sample, dim1: feature
 
         """
-        logging.info(f"__getitem__(): idx = {idx}")
         data_t0 = torch.cat([v.data[idx, :] for v in self.predictors.values()], dim=-1)
         data_t1 = torch.cat([t.data[idx, :] for t in self.targets.values()], dim=-1)
 
@@ -297,21 +296,17 @@ class Multishot_dataset():
 
     
     Args:
-        shotlist
-        t_params
-        predictors
-        targets
-        shift_targets
-        datapath
-        device
+        shotlist: list[int]
+        t_params: dict
+        predictors: list[string]
+        targets: list[string]
+        shift_targets: dict
+        datapath: string
+        device: torch.device
     """
-
-    
-   
-    def __init__(self, shotlist, t_params, predictor, targets, shift_targets, datapath, device):
+    def __init__(self, shotlist, t_params, predictors, targets, shift_targets, datapath, device):
         # Create list of D3D_datasets
-        self.datasets = [D3D_dataset(shotnr, t_params, predictor, targets, shift_targets, datapath, device) for shotnr in shotlist]
-        #self.cumulative_sizes = self.cumsum([len(ds) for ds in self.datasets])
+        self.datasets = [D3D_dataset(shotnr, t_params, predictors, targets, shift_targets, datapath, device) for shotnr in shotlist]
         
     def shot(self, idx: int):
         r"""Quick access to individual shot"""

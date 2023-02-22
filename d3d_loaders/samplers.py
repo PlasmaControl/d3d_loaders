@@ -253,7 +253,6 @@ class RandomBatchSequenceSampler_multishot():
         num_batches = self.num_shots * (len(self.indices) - self.seq_length) // self.batch_size
         for ix_b in range(0, num_batches):
             # Select starting points for sequences
-            print(idx_permuted[ix_b:ix_b+3])
             selected = idx_permuted[(ix_b * self.batch_size):((ix_b + 1) * self.batch_size)]
             yield [(s[0], range(s[1], s[1] + self.seq_length + 1)) for s in selected]
 
