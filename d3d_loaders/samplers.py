@@ -70,6 +70,53 @@ class collate_fn_seq():
         return samples[0]
 
 
+class SequentialSampler(Sampler[int]):
+    r"""Samples sequences in-order
+    
+    Given a dataset of length N, this sampler will generate (N-seq_length-1)
+    sequences of length (seq_length + 1). The starting index of these
+    (N - seq_length - 1) sequences is in order.
+    
+    # Generate sequences of length 3, as to cover [0, 1, 2, 3, 4, 5]
+    >>> my_sampler = SequentialSampler(6, 2)
+    >>> for s in my_sampler:
+    >>>     print(s)
+    [range(0, 3)]
+    [range(1, 4)]
+    [range(2, 5)]
+
+
+    In the output above, the first sequence of length (2 + 1) starts at 0: range(0,3) = [0, 1, 2].
+    The second sequence of length (2 + 1) starts at 1: range(1, 4) = [1, 2, 3].
+    
+    Thus, we have exhausted the possibility of many-to-one mappings of the kind:
+    
+    f(x_{i}, x_{i+1}, ..., x_{i + seq_length - 1}) -> y_{i + seq_length}
+    
+    Args:
+        ds_length: Length of the dataset.
+        seq_length: Length of the sequence
+    """ 
+    def __init__(self, ds_length, seq_length):
+        self.ds_length = ds_length # Length of the dataset
+        self.seq_length = seq_length # Length of the sequences to sample
+        
+    def __iter__(self):
+        """Returns fixed-length, ordered sequences that cover the dataset."""
+        for start in range(self.ds_length - self.seq_length - 1):
+            yield [range(start, start + self.seq_length + 1)]
+
+
+class collate_fn_random_batch_seq():
+    def __init__(self, batch_size):
+        self.batch_size = batch_size
+        
+    def __call__(self, x):
+        x = x[0]
+        #print(f"__call__ len(x) = {len(x)}, type(x[0]) = {type(x[0])}, x[0].shape = {x[0].shape}")
+        return x[0].reshape(self.batch_size, -1, x[0].shape[-1]), x[1].reshape(self.batch_size, -1, x[1].shape[-1])
+
+
 class SequentialSamplerBatched(Sampler):
     r"""Sample linear sequences in order, allows for batching.
 
@@ -83,7 +130,7 @@ class SequentialSamplerBatched(Sampler):
     def __iter__(self):
         """Returns fixed-length, ordered sequences that cover the dataset."""
         for start in range(0, self.ds_length - self.seq_length - 1, self.batch_size):
-            yield [range(start + bs, start + bs + self.seq_length + 1) for bs in range(self.batch_size)]
+            yield [range(start + bs, start + bs + self.seq_length + 1) for bs in range(self.batch_size) if start + bs + self.seq_length + 1 <= self.ds_length]
 
 
 class collate_fn_seq_batched():
@@ -192,109 +239,6 @@ class RandomBatchSequenceSampler(Sampler[int]):
             # Return a list of tensors, so that the entire tensor is passed to dataset.__idx__:
             # See call for map-style datasets in code example here: https://pytorch.org/docs/stable/data.html#automatic-batching-default
             yield [torch.cat([torch.arange(i, i + self.seq_length + 1) for i in ix_start])]
-
-
-class SequentialSampler(Sampler[int]):
-    r"""Samples sequences in-order
-    
-    Given a dataset of length N, this sampler will generate (N-seq_length-1)
-    sequences of length (seq_length + 1). The starting index of these
-    (N - seq_length - 1) sequences is in order.
-    
-    # Generate sequences of length 3, as to cover [0, 1, 2, 3, 4, 5]
-    >>> my_sampler = SequentialSampler(6, 2)
-    >>> for s in my_sampler:
-    >>>     print(s)
-    [range(0, 3)]
-    [range(1, 4)]
-    [range(2, 5)]
-
-
-    In the output above, the first sequence of length (2 + 1) starts at 0: range(0,3) = [0, 1, 2].
-    The second sequence of length (2 + 1) starts at 1: range(1, 4) = [1, 2, 3].
-    
-    Thus, we have exhausted the possibility of many-to-one mappings of the kind:
-    
-    f(x_{i}, x_{i+1}, ..., x_{i + seq_length - 1}) -> y_{i + seq_length}
-    
-    Args:
-        ds_length: Length of the dataset.
-        seq_length: Length of the sequence
-    """ 
-    def __init__(self, ds_length, seq_length):
-        self.ds_length = ds_length # Length of the dataset
-        self.seq_length = seq_length # Length of the sequences to sample
-        
-    def __iter__(self):
-        """Returns fixed-length, ordered sequences that cover the dataset."""
-        for start in range(self.ds_length - self.seq_length - 1):
-            yield [range(start, start + self.seq_length + 1)]
-
-
-
-class collate_fn_random_batch_seq():
-    def __init__(self, batch_size):
-        self.batch_size = batch_size
-        
-    def __call__(self, x):
-        x = x[0]
-        #print(f"__call__ len(x) = {len(x)}, type(x[0]) = {type(x[0])}, x[0].shape = {x[0].shape}")
-        return x[0].reshape(self.batch_size, -1, x[0].shape[-1]), x[1].reshape(self.batch_size, -1, x[1].shape[-1])
-
-# def collate_fn_randseq(ll, seq_length):
-#     """Works in combination with RandomSequenceSampler.
-    
-#     X list needs to skip every (seq_length+1) sample
-#     Y list needs to take only every (seq_length+1) sample
-    
-#     The input samples is a list of the dataset ds, evaluated with indices
-#     idx_list = [i, i+1, i+2, ..., i + seq_length, j, j+1, j+2, ..., j + seq_length, ..., k, k+1, ... k + seq_length].
-#     Here i, j, ..., k, are various indices that define the start of a sequence with length seq_length.
-    
-#     That is, ll = [dataset[idx] for idx in idx_list]
-    
-#     This collate_fn is specific to the D3D_dataset, where ds[idx] = (X[idx], Y[idx]).
-#     In particular, it re-orders ll = [(X[idx], Y[idx]) for idx in idx_list] 
-#     into
-    
-#     X[L, N, H] 
-#     Y[1, N, H] 
-#     where L: sequence length, N: number of batches, H: number of features
-    
-#     Y is assumed to have sequence length=1.
-    
-#     The in
-#     X[i], X[i+1], ... X[i + seq_length - 1] -> Y[i + seq_length]
-#     X[j], X[j+1], ... X[j + seq_length - 1] -> Y[j + seq_length]
-#     ...
-#     X[k], X[k+1], ... X[k + seq_length - 1] -> Y[k + seq_length]
-    
-#     Args:
-#         ll: Sequence[int] Sequence of index groups, 
-    
-#     """
-#     # List skipping code inspired by: https://stackoverflow.com/questions/40929560/skip-every-nth-index-of-numpy-array
-#     # List of indices we take for X:
-#     all_idx = [i for i in range(len(ll))]
-    
-#     # Define the indices for the predictor tensors X.
-#     x_list_idx = [i for i in all_idx]
-#     # This expression will skip every (seq_length+1)-th element in all_idx
-#     del x_list_idx[(seq_length + 1) - 1::(seq_length + 1)]
-#     # Starting at seq_length, take every (seq_length+1)-th element in all_idx
-#     y_list_idx = all_idx[seq_length::(seq_length + 1)]
-           
-#     # Stack feature tensor
-#     x = torch.cat([ll[idx][0].unsqueeze(0) for idx in x_list_idx], dim=0)
-#     LN, H = x.shape        # First dimension is product of sequence_length * batch_size
-#     N = LN // seq_length
-#     # Reshape X to (L, N, H) where L: sequence length, N: batch size and H: input_size
-#     x = x.reshape(N, seq_length, H).transpose(0,1)
-    
-#     # Stack target tensor
-#     y = torch.cat([ll[idx][1].unsqueeze(0) for idx in y_list_idx], dim=0).unsqueeze(0)
-   
-#     return x, y
 
 
 class RandomBatchSequenceSampler_multishot():
