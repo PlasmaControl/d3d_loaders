@@ -1,38 +1,187 @@
 D3D Loaders
 ===========
 
-This package implements Pytorch-style [Iterable Datasets](https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset)
-for data downloaded from the D3D MDS server `atlas.gat.com`.
-The data is expected to be present as HDF5 files. A script to download relevant data is provided.
+This package implements Pytorch-style [Iterable Datasets](https://pytorch.org/docs/stable/data.html#)
+for D3D data. It contains It contains helper function to fetch data from MDS and store it locally
+in HDF5 files. It also contains custom [samplers](https://pytorch.org/docs/stable/data.html#torch.utils.data.Sampler) to easily load batch random sequences from the data. These can be used in conjunction with
+[data loaders](https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader).
+
 
 Load Multiple Signals in Single Dataset
-========
+=======================================
 
 Import and instantiate the loader like this:
 ```python
-from d3d_loaders.d3d_loaders import D3D_dataset
-shotnr = 169113
-t_params = {'tstart' : tstart,
-            'tend'   : tend,
-            'tsample': tsample
-}
-shift_targets = {'ae_prob_delta':10.0}
+>>> from d3d_loaders.d3d_loaders import D3D_dataset
+>>> from d3d_loaders.samplers import  RandomBatchSequenceSampler, collate_fn_random_batch_seq
+>>> shotnr = 172337
+>>> t_params = {'tstart' : 200.0,
+                'tend'   : 1000.0,
+                'tsample': 1.0
+>>> }
+>>> shift_targets = {'ae_prob': 10.0}
+>>> device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-my_ds = D3D_dataset(shotnr, t_params,
-                    predictors=["pinj", "neut", "ae_prob"],
-                    targets=["ae_prob_delta"],
-                    shift_targets=shift_targets,
-                    device=device)
+
+>>> my_ds = D3D_dataset(shotnr, t_params,
+>>>                     predictors=["pinj", "tinj", "iptipp", "dstdenp", "doutu", "dssdenest", "ae_prob"],
+>>>                     targets=["ae_prob"],
+>>>                     shift_targets=shift_targets,
+>>>                     datapath="/projects/EKOLEMEN/d3dloader/test",
+>>>                     device=device)
 ```
 
-Here `shotnr` gives the shots to work on, `tstart` and `tend` define a time interval for the
-signals, and `tsample` defines the common sampling time for all signals.
-`predictors` defines a list of signals that are used to predict the `target`. A list of currently supported 
-predictors is given in a table below. `shift_targets` is the amount each time signal 
-should be shifted, except for `ae_prob_delta` where it is the interval we are 
-looking into the future to calculate our change in probability. 
-They will be stored in the dictionaries `my_ds.predictors` and `my_ds.target`
-respectively. 
+Here `shotnr` gives the shot from which the signals are used. Together `tstart`, `tend`, and
+`tsample` define a common time base for all signals. The signals are resampled in a manner that
+conserves causality, that is, no future information is used to generate a single sample.
+
+The dataset defines two groups of signals. `Predictors` are to be used as input to a model and
+`targets` are to be used as ground-truth outputs of the model. The dictionary `shift_targets`
+defines an offset by which targets are shifted into the future. The name of the signals
+refer to either `MDS` nodes or `PTDATA` point names. The names of the signals and their
+location in `MDS` or `PTDATA` is defined in the file `downloading.py`. A custom signal,
+`ae_prob` refers to output of Aza's Alfven Eigenmode probability model.
+
+Predictor and target signals are stored in the dictionaries `my_ds.predictors` and `my_ds.target` respectively. 
+
+The `datapath` argument defines the directory where the D3D data will be cached
+in `HDF5` files. There is one `HDF5` file per shot, which stores the individual signals within
+a group. If a signal is not found in that group, it will be fetched automatically and added to
+the file. The layout of the files are 
+
+```julia
+julia> fid = h5open("/projects/EKOLEMEN/d3dloader/test/172337.h5", "r")
+🗂️ HDF5.File: (read-only) /projects/EKOLEMEN/d3dloader/test/172337.h5
+├─ 📂 ali
+│  ├─ 🏷️ origin
+│  ├─ 🔢 xdata
+│  │  └─ 🏷️ xunits
+│  └─ 🔢 zdata
+│     └─ 🏷️ zunits
+├─ 📂 doutu
+│  ├─ 🏷️ origin
+│  ├─ 🔢 xdata
+│  │  └─ 🏷️ xunits
+│  └─ 🔢 zdata
+│     └─ 🏷️ zunits
+├─ 📂 dssdenest
+│  ├─ 🏷️ origin
+│  ├─ 🔢 xdata
+│  └─ 🔢 zdata
+├─ 📂 dstdenp
+│  ├─ 🏷️ origin
+│  ├─ 🔢 xdata
+│  └─ 🔢 zdata
+...
+```
+
+Each group is named after the shortname signal and contains `xdata`, `zdata` nodes returned from `gadata.py`.
+Additionally, the origin of the data is stored in the `origin` attribute, and the units of the signals
+are stored in the `xunits` and `zunits` attributes, when available.
+
+
+Additionally, a `device` can be passed. If set to be the GPU, the `predictor` and 
+`target` tensors will be stored on the GPU. This avoids having to load batches into GPU memory in the
+training data loop.
+
+
+
+Iterating over signal sequences in a single shot
+================================================
+To fetch data sequences from a single shot, we can instantiate a `DataLoader`. This package
+implements a `RandomBatchSequenceSampler` that fetches linear sequences from both, `predictor`
+and `target` tensors of the dataset. `RandomBatchSequenceSampler` fetches a batch of sequences,
+all of the same length and starting at the same random point. The sample below shows how 
+`D3D_dataset` and `RandomBatchSequenceSampler` work together to allow iteration over the sequences:
+
+```python
+>>> len(ds)
+    800
+>>> batch_size = 32
+>>> seq_length = 512
+
+>>> loader_train = torch.utils.data.DataLoader(my_ds, num_workers=0, 
+                                               batch_sampler=RandomBatchSequenceSampler(len(ds), seq_length=seq_length, batch_size=batch_size),
+                                               collate_fn = collate_fn_random_batch_seq(batch_size))
+
+>>> for x_b, y_b in loader_train:
+        print(f"x_b.shape={x_b.shape}, y_b.shape={y_b.shape}")
+
+x_b.shape=torch.Size([32, 513, 11]), y_b.shape=torch.Size([32, 513, 5])
+x_b.shape=torch.Size([32, 513, 11]), y_b.shape=torch.Size([32, 513, 5])
+x_b.shape=torch.Size([32, 513, 11]), y_b.shape=torch.Size([32, 513, 5])
+x_b.shape=torch.Size([32, 513, 11]), y_b.shape=torch.Size([32, 513, 5])
+x_b.shape=torch.Size([32, 513, 11]), y_b.shape=torch.Size([32, 513, 5])
+x_b.shape=torch.Size([32, 513, 11]), y_b.shape=torch.Size([32, 513, 5])
+x_b.shape=torch.Size([32, 513, 11]), y_b.shape=torch.Size([32, 513, 5])
+x_b.shape=torch.Size([32, 513, 11]), y_b.shape=torch.Size([32, 513, 5])
+x_b.shape=torch.Size([32, 513, 11]), y_b.shape=torch.Size([32, 513, 5])
+```
+
+In each iteration, `loader_train` returns a tuple of tensors. The first tensor contains
+`32=batch_size` sequences of length `seq_length+1`. Each sequence has `11` features, which
+is the sum of the feature dimension of each `predictor` signal. The second tensor has the
+same batch size and sequence length, but the feature dimension is `5`, corresponding to
+the probability of each Alfven Eigenmode.
+
+The length of the sequences is `seq_length+1=513`. Note also, that the `predictor` signals are
+shifted `10ms` into the future. That is the samples at `y_b[:, -1, :]`  are `11ms` ahead
+of the samples in `x_b[:, -2, :]`. 
+
+In the example above, `collate_fn_random_batch_seq` reshapes the returned data
+from `d3d_dataset.__getidx__` into a tuple of 2 tensors. The call semantics are explained in the
+code example [here](https://pytorch.org/docs/stable/data.html#disable-automatic-batching).
+Note that `RandomBatchSequenceSampler` takes care of batching. Automatic batching in the pytorch
+`DataLoader` needs to be disabled.
+
+
+
+Multi-shot datasets
+===================
+The class `Multishot_dataset` defines a dataset that spans multiple shots. It can be instantiated in
+a very similar manner:
+
+```python
+
+>>> from d3d_loaders.d3d_loaders import Multishot_dataset
+>>> from d3d_loaders.samplers import RandomBatchSequenceSampler_multishot, collate_fn_random_batch_seq_multi
+>>> shot_list_train = [172337, 172339] 
+>>> tstart = 110.0 # Time of first sample for upper triangularity is 100.0
+>>> tend = 2000.0
+>>> t_params = {"tstart": tstart, "tend": tend, "tsample": 1.0}
+>>> t_shift = 10.0
+>>> device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+>>> seq_length = 512
+>>> batch_size = 4
+>>> pred_list = ["pinj",  # Injected power
+>>>              "tinj", # Injected torque
+>>>              "iptipp",  # Target current
+>>>              "dstdenp", # Target density
+>>>              "doutu", # Top triangularity
+>>>              "dssdenest", # Line-averaged density
+>>>              "ae_prob"] # AE mode probability
+>>> targ_list = ["ae_prob"]
+
+>>> ds_train = Multishot_dataset(shot_list_train, t_params, pred_list, targ_list,
+>>>                              {"ae_prob": t_shift}, 
+>>>                              datapath="/projects/EKOLEMEN/d3dloader/test", device)
+```
+
+To iterate over a multi-shot database, we can again instantiate a DataLoader using the custom
+`RandomBatchSequenceSampler_multids` sampler as well as a custom `collate_fn`:
+
+```python
+>>> for xb, yb in loader_train_b:
+>>>     print(xb.shape, yb.shape)
+>>>    break
+
+torch.Size([513, 4, 11]) torch.Size([513, 4, 5])
+```
+
+Again, the tensor tuple `xb` and `yb` contain a batch of random sequences. But the sequences are picked
+at random from the list of shots used to construct the `Multishot_dataset`. All sequences are constructed
+from data of only a single shot.
+
 
 Downloading signals
 ===================
@@ -98,7 +247,7 @@ for i in torch.utils.data.DataLoader(my_ds):
 An example of how to use this dataloader for predictive modelling is in 'runme.py'
 
 Load Full Resolution Single Signal
-========
+==================================
 By setting `tsample=-1`, the full resolution will return with the `tstart` and `tend` 
 found closest to the true measurement values (forwards or backwards in time). This will
 not load as a dataset since you cannot temporally align the full resolution signals. 
@@ -118,8 +267,9 @@ data = sig_neut.data.numpy()
 ```
 
 
+
 Additional Files
-========
+================
 
 Another good reference is `test_datasets.ipynb` loads and plot 
 all supported signals as well as a dataset that contains both 1d and 2d signals. 
