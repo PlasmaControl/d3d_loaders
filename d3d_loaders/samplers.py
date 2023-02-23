@@ -5,10 +5,110 @@
 """
 
 import torch
-from torch.utils.data import SequentialSampler, BatchSampler, RandomSampler, Sampler
+from torch.utils.data import Sampler
 from typing import Sequence, Iterator
 import random
 import logging
+
+
+
+class SequentialSampler(Sampler):
+    r"""Samples sequences in-order
+    
+    Given a dataset of length N, this sampler will generate (N-seq_length-1)
+    sequences of length (seq_length + 1). The starting index of these
+    (N - seq_length - 1) sequences is in order.
+    
+    # Generate sequences of length 3, as to cover [0, 1, 2, 3, 4, 5]
+    >>> my_sampler = SequentialSampler(6, 2)
+    >>> for s in my_sampler:
+    >>>     print(s)
+    [range(0, 3)]
+    [range(1, 4)]
+    [range(2, 5)]
+
+
+    In the output above, the first sequence of length (2 + 1) starts at 0: range(0,3) = [0, 1, 2].
+    The second sequence of length (2 + 1) starts at 1: range(1, 4) = [1, 2, 3].
+    
+    Thus, we have exhausted the possibility of many-to-one mappings of the kind:
+    
+    f(x_{i}, x_{i+1}, ..., x_{i + seq_length - 1}) -> y_{i + seq_length}
+    
+    Args:
+        ds_length: Length of the dataset.
+        seq_length: Length of the sequence
+    """ 
+    def __init__(self, ds_length, seq_length):
+        self.ds_length = ds_length # Length of the dataset
+        self.seq_length = seq_length # Length of the sequences to sample
+        
+    def __iter__(self):
+        """Returns fixed-length, ordered sequences that cover the dataset."""
+        for start in range(self.ds_length - self.seq_length - 1):
+            yield [range(start, start + self.seq_length + 1)]
+
+class collate_fn_seq():
+    r"""Functor to be used in DtaLoader with SequentialSampler.
+
+    ```
+    >>> loader_train_seq = torch.utils.data.DataLoader(ds, num_workers=0, 
+    >>>                                          batch_sampler=SequentialSampler(len(ds), seq_length=seq_length),
+    >>>                                          collate_fn = collate_fn_seq())
+    >>> for x, y in loader_train_seq:
+    >>> print(x.shape, y.shape)
+        torch.Size([513, 11]) torch.Size([513, 5])
+        torch.Size([513, 11]) torch.Size([513, 5])
+        ...
+    ```
+
+    """
+    def __init__(self):
+        None
+        
+    def __call__(self, samples):
+        return samples[0]
+
+
+class SequentialSamplerBatched(Sampler):
+    r"""Sample linear sequences in order, allows for batching.
+
+    Similar to SequentialSampler, but returns a batch of sequences in each iteration.
+    """
+    def __init__(self, ds_length, seq_length, batch_size):
+        self.ds_length = ds_length      # Length of the dataset
+        self.seq_length = seq_length    # Length of the sequences to sample
+        self.batch_size = batch_size    # Batch size
+        
+    def __iter__(self):
+        """Returns fixed-length, ordered sequences that cover the dataset."""
+        for start in range(0, self.ds_length - self.seq_length - 1, self.batch_size):
+            yield [range(start + bs, start + bs + self.seq_length + 1) for bs in range(self.batch_size)]
+
+
+class collate_fn_seq_batched():
+    """Stacks list of sequences into a single tensor.
+
+    ```python
+    >>> batch_size = 32
+    >>> seq_length = 513
+    >>> loader_train_seq_batched = torch.utils.data.DataLoader(ds, num_workers=0, 
+    >>>                                                        batch_sampler=SequentialSamplerBatched(len(ds), seq_length, batch_size),
+    >>> for xb, yb in loader_train_seq_batched:
+    >>>     print(xb.shape, yb.shape)
+        torch.Size([513, 32, 11]) torch.Size([513, 32, 5])
+        torch.Size([513, 32, 11]) torch.Size([513, 32, 5])
+        ...
+    """
+    def __init__(self):
+        None
+        
+    def __call__(self, samples):
+        x_stacked = torch.cat([s[0][:, None, :] for s in samples], dim=1)
+        y_stacked = torch.cat([s[1][:, None, :] for s in samples], dim=1)
+        return x_stacked, y_stacked
+
+
 
 class RandomSequenceSampler(Sampler[int]):
     r"""Samples sequences randomly, without replacement.
@@ -94,60 +194,41 @@ class RandomBatchSequenceSampler(Sampler[int]):
             yield [torch.cat([torch.arange(i, i + self.seq_length + 1) for i in ix_start])]
 
 
-class SequentialSequenceSampler(Sampler[int]):
-    r"""Samples sequences randomly, without replacement.
+class SequentialSampler(Sampler[int]):
+    r"""Samples sequences in-order
     
     Given a dataset of length N, this sampler will generate (N-seq_length-1)
     sequences of length (seq_length + 1). The starting index of these
     (N - seq_length - 1) sequences is in order.
     
     # Generate sequences of length 3, as to cover [0, 1, 2, 3, 4, 5]
-    >>> rs = SequentialSequenceSampler([0, 1, 2, 3, 4, 5], 2)
-    >>> for item in rs:
-            print(item)
-    0
-    1
-    2
-    1
-    2
-    3
-    2
-    3
-    4
-    3
-    4
-    5
+    >>> my_sampler = SequentialSampler(6, 2)
+    >>> for s in my_sampler:
+    >>>     print(s)
+    [range(0, 3)]
+    [range(1, 4)]
+    [range(2, 5)]
 
 
-    In the output above, the first sequence of length (2 + 1) starts at 0: [0, 1, 2].
-    The second sequence of length (2 + 1) starts at 1: [1, 2, 3].
-    The third sequence of length (2 + 1) starts at 2: [2, 3, 4].
-    And the fourth sequence of length (2 + 1) starts at 3: [3, 4, 5].
+    In the output above, the first sequence of length (2 + 1) starts at 0: range(0,3) = [0, 1, 2].
+    The second sequence of length (2 + 1) starts at 1: range(1, 4) = [1, 2, 3].
     
     Thus, we have exhausted the possibility of many-to-one mappings of the kind:
     
     f(x_{i}, x_{i+1}, ..., x_{i + seq_length - 1}) -> y_{i + seq_length}
     
     Args:
-        seq_length: Length of the desired sequence
-    """
-    indices: Sequence[int]
+        ds_length: Length of the dataset.
+        seq_length: Length of the sequence
+    """ 
+    def __init__(self, ds_length, seq_length):
+        self.ds_length = ds_length # Length of the dataset
+        self.seq_length = seq_length # Length of the sequences to sample
         
-    def __init__(self, indices: Sequence[int], seq_length: int) -> None:
-        self.indices = indices
-        self.seq_length = seq_length
-        
-    def __iter__(self) -> Iterator[int]:
-        """Returns fixed-length sequences, starting at random."""
-        # Iterate over all possible start indices
-        # Substract seq_length + 1, so that the last element can be included as a prediciton target
-        for start in range((len(self.indices) - self.seq_length)):
-            # The yield seq_length successive indices
-            for seq_idx in self.indices[start:start+self.seq_length + 1]:
-                yield seq_idx
-            
-    def __len__(self) -> int:
-        return len(self.indices)
+    def __iter__(self):
+        """Returns fixed-length, ordered sequences that cover the dataset."""
+        for start in range(self.ds_length - self.seq_length - 1):
+            yield [range(start, start + self.seq_length + 1)]
 
 
 
@@ -160,60 +241,60 @@ class collate_fn_random_batch_seq():
         #print(f"__call__ len(x) = {len(x)}, type(x[0]) = {type(x[0])}, x[0].shape = {x[0].shape}")
         return x[0].reshape(self.batch_size, -1, x[0].shape[-1]), x[1].reshape(self.batch_size, -1, x[1].shape[-1])
 
-def collate_fn_randseq(ll, seq_length):
-    """Works in combination with RandomSequenceSampler.
+# def collate_fn_randseq(ll, seq_length):
+#     """Works in combination with RandomSequenceSampler.
     
-    X list needs to skip every (seq_length+1) sample
-    Y list needs to take only every (seq_length+1) sample
+#     X list needs to skip every (seq_length+1) sample
+#     Y list needs to take only every (seq_length+1) sample
     
-    The input samples is a list of the dataset ds, evaluated with indices
-    idx_list = [i, i+1, i+2, ..., i + seq_length, j, j+1, j+2, ..., j + seq_length, ..., k, k+1, ... k + seq_length].
-    Here i, j, ..., k, are various indices that define the start of a sequence with length seq_length.
+#     The input samples is a list of the dataset ds, evaluated with indices
+#     idx_list = [i, i+1, i+2, ..., i + seq_length, j, j+1, j+2, ..., j + seq_length, ..., k, k+1, ... k + seq_length].
+#     Here i, j, ..., k, are various indices that define the start of a sequence with length seq_length.
     
-    That is, ll = [dataset[idx] for idx in idx_list]
+#     That is, ll = [dataset[idx] for idx in idx_list]
     
-    This collate_fn is specific to the D3D_dataset, where ds[idx] = (X[idx], Y[idx]).
-    In particular, it re-orders ll = [(X[idx], Y[idx]) for idx in idx_list] 
-    into
+#     This collate_fn is specific to the D3D_dataset, where ds[idx] = (X[idx], Y[idx]).
+#     In particular, it re-orders ll = [(X[idx], Y[idx]) for idx in idx_list] 
+#     into
     
-    X[L, N, H] 
-    Y[1, N, H] 
-    where L: sequence length, N: number of batches, H: number of features
+#     X[L, N, H] 
+#     Y[1, N, H] 
+#     where L: sequence length, N: number of batches, H: number of features
     
-    Y is assumed to have sequence length=1.
+#     Y is assumed to have sequence length=1.
     
-    The in
-    X[i], X[i+1], ... X[i + seq_length - 1] -> Y[i + seq_length]
-    X[j], X[j+1], ... X[j + seq_length - 1] -> Y[j + seq_length]
-    ...
-    X[k], X[k+1], ... X[k + seq_length - 1] -> Y[k + seq_length]
+#     The in
+#     X[i], X[i+1], ... X[i + seq_length - 1] -> Y[i + seq_length]
+#     X[j], X[j+1], ... X[j + seq_length - 1] -> Y[j + seq_length]
+#     ...
+#     X[k], X[k+1], ... X[k + seq_length - 1] -> Y[k + seq_length]
     
-    Args:
-        ll: Sequence[int] Sequence of index groups, 
+#     Args:
+#         ll: Sequence[int] Sequence of index groups, 
     
-    """
-    # List skipping code inspired by: https://stackoverflow.com/questions/40929560/skip-every-nth-index-of-numpy-array
-    # List of indices we take for X:
-    all_idx = [i for i in range(len(ll))]
+#     """
+#     # List skipping code inspired by: https://stackoverflow.com/questions/40929560/skip-every-nth-index-of-numpy-array
+#     # List of indices we take for X:
+#     all_idx = [i for i in range(len(ll))]
     
-    # Define the indices for the predictor tensors X.
-    x_list_idx = [i for i in all_idx]
-    # This expression will skip every (seq_length+1)-th element in all_idx
-    del x_list_idx[(seq_length + 1) - 1::(seq_length + 1)]
-    # Starting at seq_length, take every (seq_length+1)-th element in all_idx
-    y_list_idx = all_idx[seq_length::(seq_length + 1)]
+#     # Define the indices for the predictor tensors X.
+#     x_list_idx = [i for i in all_idx]
+#     # This expression will skip every (seq_length+1)-th element in all_idx
+#     del x_list_idx[(seq_length + 1) - 1::(seq_length + 1)]
+#     # Starting at seq_length, take every (seq_length+1)-th element in all_idx
+#     y_list_idx = all_idx[seq_length::(seq_length + 1)]
            
-    # Stack feature tensor
-    x = torch.cat([ll[idx][0].unsqueeze(0) for idx in x_list_idx], dim=0)
-    LN, H = x.shape        # First dimension is product of sequence_length * batch_size
-    N = LN // seq_length
-    # Reshape X to (L, N, H) where L: sequence length, N: batch size and H: input_size
-    x = x.reshape(N, seq_length, H).transpose(0,1)
+#     # Stack feature tensor
+#     x = torch.cat([ll[idx][0].unsqueeze(0) for idx in x_list_idx], dim=0)
+#     LN, H = x.shape        # First dimension is product of sequence_length * batch_size
+#     N = LN // seq_length
+#     # Reshape X to (L, N, H) where L: sequence length, N: batch size and H: input_size
+#     x = x.reshape(N, seq_length, H).transpose(0,1)
     
-    # Stack target tensor
-    y = torch.cat([ll[idx][1].unsqueeze(0) for idx in y_list_idx], dim=0).unsqueeze(0)
+#     # Stack target tensor
+#     y = torch.cat([ll[idx][1].unsqueeze(0) for idx in y_list_idx], dim=0).unsqueeze(0)
    
-    return x, y
+#     return x, y
 
 
 class RandomBatchSequenceSampler_multishot():
@@ -254,6 +335,12 @@ class RandomBatchSequenceSampler_multishot():
         for ix_b in range(0, num_batches):
             # Select starting points for sequences
             selected = idx_permuted[(ix_b * self.batch_size):((ix_b + 1) * self.batch_size)]
+            # Remember to return a list. PyTorch dataloader passes each item in the
+            # returned list to dataset.__getidx__. If we only return a single list,
+            # each scalar index in that list would be passed to __getidx__.
+            # If we return a list of lists, that inner list will be passed to __getidx__.
+            # Then this list will be used for indexing.
+            # Long story short: pass list of lists, not a single list.
             yield [(s[0], range(s[1], s[1] + self.seq_length + 1)) for s in selected]
 
 
