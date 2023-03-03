@@ -156,6 +156,27 @@ class collate_fn_seq_batched():
         return x_stacked, y_stacked
 
 
+class SequentialSamplerBatched_multi(Sampler):
+    r"""Sample batched, linear sequences from multishot dataset."""
+    def __init__(self, num_shots:int, num_elements: int, seq_length: int, batch_size: int) -> None:
+        self.num_shots = num_shots
+        self.num_elements = num_elements
+        self.seq_length = seq_length
+        self.batch_size = batch_size
+
+    def __iter__(self):
+        """Return a batch of linear sequences.
+        
+        * Always exhaust one dataset, even if it means that the batch will be smaller than 
+          requested batch_size, before continuing on the next shot.
+        """
+        for s in range(0, self.num_shots):
+            for start in range(0, self.num_elements - self.seq_length - 1, self.batch_size):
+                yield [(s, range(start + b, start + b + self.seq_length + 1)) for b in range(self.batch_size) if start + b + self.seq_length + 1 <= self.num_elements]
+        
+
+
+
 
 class RandomSequenceSampler(Sampler[int]):
     r"""Samples sequences randomly, without replacement.

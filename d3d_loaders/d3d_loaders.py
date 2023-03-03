@@ -12,7 +12,6 @@ from d3d_loaders.signal2d import *
 import logging
 
 
-
 class D3D_dataset(torch.utils.data.Dataset):
     """Implements an iterable dataset for D3D data.
 
@@ -100,107 +99,73 @@ class D3D_dataset(torch.utils.data.Dataset):
             #     t_shift = 0.0
             # t_params_key["t_shift"] = t_shift
             # Load Signal
+            logging.info(f"Adding {pred_name} to predictor list.")
             if pred_name == "pinj":
-                logging.info(f"Adding pinj to predictor list.")
-                self.predictors["pinj"] = signal_pinj(shotnr, t_params, datapath=self.datapath, device=device)
-
+                self.predictors[pred_name] = signal_pinj(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "tinj":
-                logging.info(f"Adding pinj to predictor list.")
-                self.predictors["tinj"] = signal_pinj(shotnr, t_params, datapath=self.datapath, device=device)
-
+                self.predictors[pred_name] = signal_tinj(shotnr, t_params, datapath=self.datapath, device=device)
+            elif pred_name == "bmspinj":
+                self.predictors[pred_name] = signal_bmspinj(shotnr, t_params, datapath=self.datapath, device=device)
+            elif pred_name == "bmstinj":
+                self.predictors[pred_name] = signal_bmstinj(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "ae_prob":
-                logging.info(f"Adding ae_prob to predictor list.")
-                self.predictors["ae_prob"] = signal_ae_prob(shotnr, t_params, datapath=self.datapath, device=device)
-                
+                self.predictors[pred_name] = signal_ae_prob(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "neutronsrate":
-                logging.info(f"Adding neutron rate to predictor list.")         
-                self.predictors["neut"] = signal_neut(shotnr, t_params, datapath=self.datapath, device=device)
-            
+                self.predictors[pred_name] = signal_neut(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "ip":
-                logging.info(f"Adding injected power to predictor list.")         
-                self.predictors["ip"] = signal_ip(shotnr, t_params, datapath=self.datapath, device=device)
-            
+                self.predictors[pred_name] = signal_ip(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "iptipp":
-                logging.info(f"Adding target current to predictor list.")
-                self.predictors["iptipp"] = signal_iptipp(shotnr, t_params, datapath=self.datapath, device=device)
-
+                self.predictors[pred_name] = signal_iptipp(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "dstdenp":
-                logging.info(f"Adding target density to predictor list.")
-                self.predictors["dstdenp"] = signal_dstdenp(shotnr, t_params, datapath=self.datapath, device=device)
-
+                self.predictors[pred_name] = signal_dstdenp(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "dssdenest":
-                logging.info("Adding line-averaged density to predictor list")
-                self.predictors["dssdenest"] = signal_dssdenest(shotnr, t_params, datapath=self.datapath, device=device)
-
+                self.predictors[pred_name] = signal_dssdenest(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "echpwrc":
-                logging.info(f"Adding ECH to predictor list.")         
-                self.predictors["echpwrc"] = signal_ech(shotnr, t_params, datapath=self.datapath, device=device)
-
+                self.predictors[pred_name] = signal_ech(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "ali":
-                logging.info(f"Adding Internal inductance to predictor list.")         
-                self.predictors["ali"] = signal_ech(shotnr, t_params, datapath=self.datapath, device=device)
-
+                self.predictors[pred_name] = signal_ech(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "q95":
-                logging.info(f"Adding q95 to predictor list.")         
-                self.predictors["q95"] = signal_q95(shotnr, t_params, datapath=self.datapath, device=device)
-                
+                self.predictors[pred_name] = signal_q95(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "kappa":
-                logging.info(f"Adding kappa to predictor list.")         
-                self.predictors["kappa"] = signal_kappa(shotnr, t_params, datapath=self.datapath, device=device)
-                
+                self.predictors[pred_name] = signal_kappa(shotnr, t_params, datapath=self.datapath, device=device)
+            elif pred_name == "pcbcoil":
+                self.predictors[pred_name] = signal_pcbcoil(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "dens":
-                logging.info(f"Adding density profile to predictor list.")         
-                self.predictors["dens"] = signal_dens(shotnr, t_params, datapath=self.datapath, device=device)
-                
+                self.predictors[pred_name] = signal_dens(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "pres":
-                logging.info(f"Adding pressure profile to predictor list.")         
-                self.predictors["pres"] = signal_pres(shotnr, t_params, datapath=self.datapath, device=device)
-                
+                self.predictors[pred_name] = signal_pres(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "temp":
-                logging.info(f"Adding temperature profile to predictor list.")         
-                self.predictors["temp"] = signal_temp(shotnr, t_params, datapath=self.datapath, device=device)
-                
+                self.predictors[pred_name] = signal_temp(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "q":
-                logging.info(f"Adding q profile to predictor list.")         
-                self.predictors["q"] = signal_q(shotnr, t_params, datapath=self.datapath, device=device)
-                
+                self.predictors[pred_name] = signal_q(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "doutl":
-                logging.info(f"Adding lower triangularity to predictor list.")         
-                self.predictors["tri_l"] = signal_doutl(shotnr, t_params, datapath=self.datapath, device=device)
-            
+                self.predictors[pred_name] = signal_doutl(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "doutu":
-                logging.info(f"Adding upper triangularity to predictor list.")         
-                self.predictors["tri_u"] = signal_doutu(shotnr, t_params, datapath=self.datapath, device=device)
-                
+                self.predictors[pred_name] = signal_doutu(shotnr, t_params, datapath=self.datapath, device=device)
+            elif pred_name == "tritop":
+                self.predictors[pred_name] = signal_tritop(shotnr, t_params, datapath=self.datapath, device=device)
+            elif pred_name == "tribot":
+                self.predictors[pred_name] = signal_tritop(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "raw_ece":
-                logging.info(f"Adding raw ECE signals to predictor list.") 
                 # Currently no way to subset ECE channels
                 # channels = []
-                self.predictors["raw_ece"] = signal_ece(shotnr, t_params, datapath=self.datapath, device=device)
-            
+                self.predictors[pred_name] = signal_ece(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "raw_co2_dp":
-                logging.info(f"Adding raw CO2 dp signals to predictor list.") 
                 # Currently no way to subset CO2 channels
                 # channels = []
-                self.predictors["raw_co2_dp"] = signal_co2_dp(shotnr, t_params, datapath=self.datapath, device=device)
-                
+                self.predictors[pred_name] = signal_co2_dp(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "raw_co2_pl":
-                logging.info(f"Adding raw CO2 pl signals to predictor list.") 
                 # Currently no way to subset CO2 channels
                 # channels = []
-                self.predictors["raw_co2_pl"] = signal_co2_pl(shotnr, t_params, datapath=self.datapath, device=device)
-            
+                self.predictors[pred_name] = signal_co2_pl(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "raw_mpi":
-                logging.info(f"Adding raw MPI dp signals to predictor list.") 
                 # Currently no way to subset MPI angles
                 # angles = []
-                self.predictors["raw_mpi"] = signal_mpi(shotnr, t_params, datapath=self.datapath, device=device)
-            
+                self.predictors[pred_name] = signal_mpi(shotnr, t_params, datapath=self.datapath, device=device)
             elif pred_name == "raw_bes":
-                logging.info(f"Adding raw BES signals to predictor list.") 
                 # Currently no way to subset BES channels
                 # channels = []
-                self.predictors["raw_bes"] = signal_BES(shotnr, t_params, datapath=self.datapath, device=device)
+                self.predictors[pred_name] = signal_BES(shotnr, t_params, datapath=self.datapath, device=device)
             
             # Add other predictors here
             else:
@@ -215,19 +180,20 @@ class D3D_dataset(torch.utils.data.Dataset):
         for target_name in targets:
             t_params_target = t_params.copy()
             t_params_target["tshift"] = shift_targets[target_name]
-            
-            if target_name == "ae_prob_delta":
-                logging.info(f"Adding ae_prob_delta to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_params_target['tshift']}ms")
-                self.targets["ae_prob_delta"] = signal_ae_prob_delta(shotnr, t_params_target, datapath=self.datapath, device=device)
-            
-            elif target_name == "uci_label":
-                logging.info(f"Adding uci_label to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_params_target['tshift']}ms")
-                self.targets["uci_label"] = signal_uci_label(shotnr, t_params_target, datapath=self.datapath, device=device)
 
+            logging.info(f"Adding {target_name} to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_params_target['tshift']}ms")
+
+
+            if target_name == "ae_prob_delta":
+                self.targets[target_name] = signal_ae_prob_delta(shotnr, t_params_target, datapath=self.datapath, device=device)
+            elif target_name == "uci_label":
+                self.targets[target_name] = signal_uci_label(shotnr, t_params_target, datapath=self.datapath, device=device)
             elif target_name == "ae_prob":
-                logging.info(f"Adding ae_prob_delta to target list: t = {self.tstart}-{self.tend}ms, tsample={self.tsample}ms, t_shift={t_params_target['tshift']}ms")
-                self.targets["ae_prob"] = signal_ae_prob(shotnr, t_params_target, datapath=self.datapath, device=device)
- 
+                self.targets[target_name] = signal_ae_prob(shotnr, t_params_target, datapath=self.datapath, device=device)
+            elif target_name == "AE_predictions":
+                self.targets[target_name] = signal_AE_pred(shotnr, t_params_target, datapath=self.datapath, device=device)
+            elif target_name == "betan":
+                self.targets[target_name] = signal_betan(shotnr, t_params_target, datapath=self.datapath, device=device)
             # Add other targets here
             else:
                 raise(ValueError(f'{target_name} is not a valid target'))
@@ -311,6 +277,9 @@ class Multishot_dataset():
     def shot(self, idx: int):
         r"""Quick access to individual shot"""
         return self.datasets[idx]
+
+    def __len__(self):
+        return len(self.dataset)
         
     def __getitem__(self, idx):
         """Fetch data from random dataset.

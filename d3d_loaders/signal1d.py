@@ -152,6 +152,12 @@ class signal_1d():
         except ValueError as e:
             logging.error(f"Unable to load timebase for shot {self.shotnr} signal {self.name}")
             raise e
+
+        # Some shots have no data for a given signal. In that case, the tensor is present in the
+        # dataset but the size is 0. Throw an error if that is the case.
+        if tb.shape[0] < 2:
+            raise ValueError(f"Shot {self.shotnr}, signal {self.key}: Timebase in HDF5 file has length {tb.shape[0]} < 2!")
+        
         # Indices to sample on
         t_inds = self._get_time_sampling(tb)        
         data = torch.tensor(fp[self.key]["zdata"][:])[t_inds]
@@ -222,6 +228,22 @@ class signal_tinj(signal_1d):
         super().__init__(shotnr, t_params, datapath, device)
 
 
+class signal_bmspinj(signal_1d):
+    """Injected torque"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
+        self.key = "bmspinj"
+        self.name = "bmspinj"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
+class signal_bmstinj(signal_1d):
+    """Injected torque"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
+        self.key = "bmstinj"
+        self.name = "bmstinj"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
 class signal_neut(signal_1d):
     """Neutrons rate 1d signal"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
@@ -262,6 +284,15 @@ class signal_ip(signal_1d):
         super().__init__(shotnr, t_params, datapath, device)
 
 
+class signal_betan(signal_1d):
+    """Injected power 1d signal"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
+        self.key = "betan"
+        self.name = "betan"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
+
 class signal_doutl(signal_1d):
     """Lower triangularity shape profile"""
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
@@ -275,6 +306,21 @@ class signal_doutu(signal_1d):
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "doutu"
         self.name = "upper triangularity"
+        super().__init__(shotnr, t_params, datapath, device)
+
+class signal_tritop(signal_1d):
+    """Lower triangularity shape profile"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
+        self.key = "tritop"
+        self.name = "lower triangularity"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
+class signal_tribot(signal_1d):
+    """Upper triangularity shape profile"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
+        self.key = "tribot"
+        self.name = "lower triangularity"
         super().__init__(shotnr, t_params, datapath, device)
 
 
@@ -299,4 +345,11 @@ class signal_kappa(signal_1d):
     def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
         self.key = "kappa"
         self.name = "kappa"
+        super().__init__(shotnr, t_params, datapath, device)
+
+class signal_pcbcoil(signal_1d):
+    """PCBcoil signal."""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMENT/d3d_loader", device="cpu"):
+        self.key = "pcbcoil"
+        self.name = "pcbcoil"
         super().__init__(shotnr, t_params, datapath, device)

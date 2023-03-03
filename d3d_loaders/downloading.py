@@ -14,6 +14,14 @@ from os.path import join
 
 import logging
 
+raise DeprectiationWarning("""
+
+            This code is not maintained and signal definitions may be obsolete.
+            To download datafiles, please use https://github.com/PlasmaControl/d3d_signals
+
+                            """)
+                              
+
 
 # Set the environment variable to connect to the correct MDS server
 # 
@@ -54,6 +62,8 @@ scalars_dict = {"tinj": {"Tree": "D3D", "Node": "NB:TINJ", "map_to": "tinj"},
                 "pinjf_30r": {"Tree": "D3D", "Node": "NB.NB30R:PINJF_30R", "map_to": "pinjf_30r"},
                 "pinjf_33l": {"Tree": "D3D", "Node": "NB.NB33L:PINJF_33L", "map_to": "pinjf_33l"},
                 "pinjf_33r": {"Tree": "D3D", "Node": "NB.NB33R:PINJF_33R", "map_to": "pinjf_33r"},
+                "triangularity_u": {"Tree": "D3D", "Node": "\\triangularity_u", "map_to": "triangularity_u"},
+                "triangularity_l": {"Tree": "D3D", "Node": "\\triangularity_l", "map_to": "triangularity_l"},
                 "tecef01": {"Tree": "D3D", "Node": "ELECTRONS.ECE.TECEF.TECEF01", "map_to": "tecef01"},
                 "tecef02": {"Tree": "D3D", "Node": "ELECTRONS.ECE.TECEF.TECEF02", "map_to": "tecef02"},
                 "tecef03": {"Tree": "D3D", "Node": "ELECTRONS.ECE.TECEF.TECEF03", "map_to": "tecef03"},
@@ -107,6 +117,10 @@ scalars_dict = {"tinj": {"Tree": "D3D", "Node": "NB:TINJ", "map_to": "tinj"},
 #   map_to - The group in the HDF5 file the data will be stored in
 scalars_pt = {"Target current": {"Node": r"\iptipp", "map_to": "iptipp"},
               "Target density": {"Node": r"\dstdenp", "map_to": "dstdenp"},
+              "PCBcoil": {"Node": r"\pcbcoil", "map_to": "pcbcoil"},
+              "PCBcoil": {"Node": r"\pcbcoil", "map_to": "bmspinj"},
+              "Beam: injected power": {"Node": r"\bmspinj", "map_to": "bmspinj"},
+              "Beam: injected torque": {"Node": r"\bmstinj", "map_to": "bmstinj"},
               "line-averaged density": {"Node": r"\dssdenest", "map_to": "dssdenest"}}
 
 

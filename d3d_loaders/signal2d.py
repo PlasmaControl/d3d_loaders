@@ -25,7 +25,9 @@ class signal_2d(signal_1d):
     Aims to use data stored in /projects/EKOLEMEN/d3dloader.
     Check README for currently supported signals.
 
-    """    
+    """ 
+    def __init__(self, shotnr, t_params, datapath, device):
+        super().__init__(shotnr, t_params, datapath, device)
 
     def _cache_data(self):
         """Load 2d profile from hdf5 data file.
@@ -41,7 +43,7 @@ class signal_2d(signal_1d):
 
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
-        fp = h5py.File(join(self.datapath, f"{shotnr}.h5")) 
+        fp = h5py.File(join(self.datapath, f"{self.shotnr}.h5")) 
         try:
             tb = fp[self.key]["xdata"][:] # Get time-base
         except ValueError as e:
@@ -49,7 +51,7 @@ class signal_2d(signal_1d):
             raise e
         
         t_inds = self._get_time_sampling(tb)
-        prof_data = (torch.tensor(fp[self.key]["zdata"][:]).T)[t_inds,:]
+        prof_data = torch.tensor(fp[self.key]["zdata"][t_inds, :])
         fp.close()
 
         elapsed = time.time() - t0_p
@@ -91,6 +93,14 @@ class signal_q(signal_2d):
         self.key = "q"
         self.file_label = "profiles"
         self.name = "q"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
+class signal_AE_pred(signal_2d):
+    """Pre-calcualted AE predictions"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
+        self.key = "AE_predictions"
+        self.name = "AE_predictions"
         super().__init__(shotnr, t_params, datapath, device)
 
 

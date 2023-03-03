@@ -268,8 +268,20 @@ data = sig_neut.data.numpy()
 
 
 
-Additional Files
-================
+Full training examples
+======================
 
-Another good reference is `test_datasets.ipynb` loads and plot 
-all supported signals as well as a dataset that contains both 1d and 2d signals. 
+The folder `examples` contains several notebooks that illustrate how to train predictive
+models using the infrastructure provided in this package. In particular, the notebook
+`AE_pred_LSTMtest_1723xx.ipynb` shows how to train a LSTM-based model for predictive
+tasks. And the nodebook `AE_pred_transformer_154xxx.ipynb` shows how to train a transformer-based
+model for predictive tasks. Both notebooks rely on the dataset and dataloader infrastructure
+implemented in this package. 
+
+The datasets used by the notebooks are located on Princeton's gpfs, accessible on
+`stellar` and `traverse`: `stellar:/projects/EKOLEMEN/AE_datasets`. They have been compiled
+using the [d3d_signals](https://github.com/PlasmaControl/d3d_signals) package. Definitions of
+the datasets in `yaml` format is [here](https://github.com/PlasmaControl/AE_datasets). 
+There is an additional `README` with notes on issues that arose when compiling the dataset. 
+
+
