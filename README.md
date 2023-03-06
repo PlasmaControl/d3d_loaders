@@ -254,7 +254,7 @@ not load as a dataset since you cannot temporally align the full resolution sign
 An example for loading  neutron rate into a numpy array is below
 
 ```python
-from d3d_loaders.signal1d import signal_neut
+from d3d_loaders.signal0d import signal_neut
 shotnr = 169113
 t_params = {'tstart' : tstart,
             'tend'   : tend,

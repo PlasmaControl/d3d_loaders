@@ -1,355 +1,578 @@
 #-*- encoding: utf-8 -*-
 
-"""Contains class definitions used to as abstractions for 1d signals."""
+"""Contains class definitions used to as abstractions for 2d signals."""
 
 from os.path import join
 import time
-
+import pickle
 import numpy as np
+
 import h5py
 import torch
 
 import logging
+import sys
+sys.path.append("..")
 
-class signal_1d():
-    """Base class for a 1d sample.
+from d3d_loaders.signal0d import signal_base
+from d3d_loaders.rcn_functions import rcn_infer
+
+
+class signal_1d(signal_base):
+    """Base class for a 1d sample (profiles etc).
 
     Represents a 1-d signal over [tstart:tend].
-    Aims to use data stored in /projects/EKOLEMEN/aza_lenny_data1/template.
+    Aims to use data stored in /projects/EKOLEMEN/d3dloader.
     Check README for currently supported signals.
 
+    """ 
+    def __init__(self, shotnr, t_params, datapath, device):
+        super().__init__(shotnr, t_params, datapath, device)
 
-    """
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Assumes the xdata and zdata keys are present and data resides in the shotnr_profile.h5 files.
+        Other signals will need to override this function to cache data correctly.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples dim1: profile length
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        fp = h5py.File(join(self.datapath, f"{self.shotnr}.h5")) 
+        try:
+            tb = fp[self.key]["xdata"][:] # Get time-base
+        except ValueError as e:
+            logging.error(f"Unable to load timebase for shot {self.shotnr} signal {self.name}")
+            raise e
+        
+        t_inds = self._get_time_sampling(tb)
+        prof_data = torch.tensor(fp[self.key]["zdata"][t_inds, :])
+        fp.close()
+
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading {self.name}, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        return prof_data
+
+
+class signal_dens(signal_1d):
+    """Density profile"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
+        self.key = "edensfit"
+        self.file_label = "profiles"
+        self.name = "dens"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
+class signal_temp(signal_1d):
+    """Electron Temperature profile"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
+        self.key = "etempfit"
+        self.file_label = "profiles"
+        self.name = "temp"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
+class signal_pres(signal_1d):
+    """Pressure profile"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
+        self.key = "pres"
+        self.file_label = "profiles"
+        self.name = "pres"
+        super().__init__(shotnr, t_params, datapath, device)
+    
+    
+class signal_q(signal_1d):
+    """q profile"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
+        self.key = "q"
+        self.file_label = "profiles"
+        self.name = "q"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
+class signal_AE_pred(signal_1d):
+    """Pre-calcualted AE predictions"""
+    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
+        self.key = "AE_predictions"
+        self.name = "AE_predictions"
+        super().__init__(shotnr, t_params, datapath, device)
+
+
+class signal_ae_prob(signal_1d):
+    """Probability for a given Alfven Eigenmode."""
     def __init__(self, shotnr, t_params, 
-            datapath="/projects/EKOLEMEN/d3d_loader",
+            datapath="/projects/EKOLEMEN/d3dloader",
             device="cpu"):
-        """Load data from HDF5 file, standardize, and move to device.
-
+        """Loads weights for RCN model and calls base class constructor.
+        
         Parameters
         ----------
-        shotnr : int
+        shotnr : Int
                  Shot number
-
-        t_params : dict
-                   Contains the following necessary keys:
-                 
-                        tstart : float
-                                    Start of signal interval, in milliseconds
-                        tend : float
-                                End of signal interval, in milliseconds
-                        tsample : float
-                                    Desired sampling time, in milliseconds
-                                    
-                   Optional keys/arguments:
-                        tshift : float, default=0.0
-                                Shift signal by tshift with respect to tstart, in milliseconds
-                                    
+        tstart : float
+                 Start of signal interval, in milliseconds
+        tend : float
+               End of signal interval, in milliseconds
+        tsample : float
+                  Desired sampling time, in milliseconds
+        tshift : float, default=0.0
+                 Shift signal by tshift with respect to tstart, in milliseconds
         datapath : string, default='/projects/EKOLEMEN/aza_lenny_data1'
                    Basepath where HDF5 data is stored.  
         device : string, default='cpu'
                  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         """
-        # Store function arguments as member variables
+        self.name = 'ae_prob'
+        # The RCN model weights are needed to call the base-class constructor
+        with open('/home/rkube/ml4control/1dsignal-model-AE-ECE-RCN.pkl', 'rb') as df:
+            self.infer_data = pickle.load(df)
+        self.n_res_l1 = self.infer_data['layer1']['w_in'].shape[0]
+        self.n_res_l2 = self.infer_data['layer2']['w_in'].shape[0]
+
+        # Call base class constructor to fetch and store data
+        super().__init__(shotnr, t_params, datapath, device)
+
+
+    def _cache_data(self):
+        """Loads ECE data and calculates AE probability using Aza's RCN model.
+
+        The RCN model is used to translate ECE data to Alfven Eigenmod probability.
+        This has to be done sequentially, i.e. by iterating over all samples.
+        
+        
+        Returns
+        -------
+        ae_probs : tensor
+                   Probability for presence of an Alfven Eigenmode. dim0: samples. dim1: features
+        """
+        # Find how many samples apart tsample is
+        t0_p = time.time()
+        # Don't use scope. This throws off multi-threaded loaders
+        fname = join(self.datapath, f"{self.shotnr}.h5")
+        fp = h5py.File(fname, "r") 
+        tb = fp["tecef01"]["xdata"][:]    # Get ECE time-base
+        t_inds = self._get_time_sampling(tb)
+        # Read in ece_data  as numpy array for consumption 
+        ece_data = np.vstack([fp[f"tecef{i:02d}"]["zdata"][t_inds] for i in range(1, 41)]).T
+        fp.close()
+        # After this we have ece_data_0.shape = (num_samples / nth_sample, 40)
+
+        # Pre-allocate array for AE mode probabilities
+        # dim0: time index
+        # dim1: AE mode index 0...4
+        ae_probs = np.zeros([ece_data.shape[0], 5], dtype=np.float32)
+
+        ece_data = (ece_data - self.infer_data["mean"]) / self.infer_data["std"]
+        # Initialize to zero, overwrite in for loop
+        r_prev = {"layer1": np.zeros(self.n_res_l1),
+                  "layer2": np.zeros(self.n_res_l2)} 
+        #print(ece_data.shape)
+        # Iterate over time index 0
+        for idx, u in enumerate(ece_data):
+            L = "layer1"
+            #print(idx, u.shape)
+            r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
+                                     self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
+                                     self.infer_data[L]['leak_rate'], r_prev[L], u.T)
+
+            L = "layer2"
+            r_prev[L], y = rcn_infer(self.infer_data[L]['w_in'], self.infer_data[L]['w_res'],
+                                     self.infer_data[L]['w_bi'], self.infer_data[L]['w_out'],
+                                     self.infer_data[L]['leak_rate'], r_prev[L], y)
+            ae_probs[idx, :] = y[:]
+
+        elapsed = time.time() - t0_p
+
+        logging.info(f"Caching AE forward model using RCN, {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
+
+        return torch.tensor(ae_probs)
+
+
+class signal_ae_prob_delta(signal_1d):
+    """Change in Alfven Eigenmode probability over time""" 
+    def __init__(self, shotnr, t_params, 
+            datapath="/projects/EKOLEMEN/d3dloader",
+            device="cpu"):
+        """Construct difference in AE probability using two signal_ae_prob.
+        
+        Parameters
+        ----------
+        shotnr : Int
+                 Shot number
+        t_params: dict
+                  Contains the following necessary keys:
+                 
+                    tstart : float
+                             Start of signal interval, in milliseconds
+                    tend : float
+                           End of signal interval, in milliseconds
+                    tsample : float
+                              Desired sampling time, in milliseconds
+                                    
+                  Optional keys/arguments:
+                    tshift : float, default=0.0
+                             Shift signal by tshift with respect to tstart, in milliseconds
+        datapath : string, default='/projects/EKOLEMEN/d3dloader'
+                   Basepath where HDF5 data is stored.  
+        device : string, default='cpu'
+                 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        Constructs a the change in Alfven Eigenmode probability using a finite difference method.
+        The signals are separated by t_shift.
+        """
+        self.name = 'ae_prob_delta'
+        
+
+
+
         self.shotnr = shotnr
         self.tstart = t_params["tstart"]
         self.tend = t_params["tend"]
         self.tsample = t_params["tsample"]
-        try:
-            self.tshift = t_params["tshift"]
-        except:
-            self.tshift = 0.0
+        if("tshift" not in t_params.keys()):
+            raise(KeyError("dictionary key 'tshift' not found when constructing `signal_ae_prob_delta`"))
+
         self.datapath = datapath
-        
-        # Load data from HDF5 file and store, move to device
-        self.data = self._cache_data().to(device)
-        # Z-score normalization
+        self.data = ((signal_t1.data * signal_t1.data_std) + signal_t1.data_mean) - ((signal_t0.data * signal_t0.data_std) + signal_t0.data_mean) 
         self.data_mean = self.data.mean()
         self.data_std = self.data.std()
         self.data = (self.data - self.data_mean) / (self.data_std + 1e-10)
-        logging.info(f"""Compiled signal {self.__class__.__name__}, 
-                         tstart={self.tstart}, tend={self.tend}, tsample={self.tsample}, tshift={self.tshift},
-                         datapath={self.datapath}, 
-                         mean={self.data_mean}, std={self.data_std}""")
 
-    def _get_time_sampling(self, tb):
-        """
-        Use the time base to calculate the closest indices to desired tsample
-        
-        NOTE: 
-        If tsample is set to -1, will return the full signal between tstart and tend
-        
-        Parameters
-        ----------
-        tb : float array
-                time base array, the time each sample corresponds to.
-        
-        Returns
-        -------
-        t_inds: int array
-                    Index of closest measurement to desired time
-                    (desired time is a ceiling so no data from future)
-        """      
-        # Return full signal if tsample is -1
-        if self.tsample == -1:
-            # Finds closest start and end indices, forward or backwards in time
-            tstart_ind = np.searchsorted(tb, self.tstart)
-            tend_ind = np.searchsorted(tb, self.tend)
-            return np.arange(tstart_ind, tend_ind)
-         
-        # Forced sampling times
-        time_samp_vals = np.arange(self.tstart, self.tend, self.tsample)
-        
-        # Shift times. To have samples at a future time (shifted by tshift) line up
-        # at the same index as the unshifted time, we need to subtract the time shift
-        # from the time-base.
-        
+        # Shifted signal
+        signal_t1 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
+        # Signal at t0, set t_shift = 0
+        t_params["tshift"] = 0.0
+        signal_t0 = signal_ae_prob(shotnr, t_params, datapath=datapath, device=device)
 
-        time_samp_vals -= self.tshift
-        if self.tshift > 0.0:
-            logging.info(f"shifted time_samp_vals = {time_samp_vals}")
-
-        tb_ind = 1 # Index of time in tb
-        num_samples = len(time_samp_vals)
-        t_inds = np.zeros((num_samples,), dtype=int)
-        
-        # Raise error if first time sample comes before first measurement
-        if tb[0] > time_samp_vals[0]:
-            raise(ValueError(f'Time of first requested sample is before first real measurement was taken for {self.name}'))
-        
-        for i, time_samp in enumerate(time_samp_vals):
-            # Scan the signals time_base as long as we are below the next desired sampling time
-            while tb[tb_ind] < time_samp and tb_ind < len(tb) - 1:
-                tb_ind += 1
-            
-            # Save last index where tb[tb_ind] < time_samp
-            t_inds[i] = tb_ind - 1
-
-        return t_inds
-
-    def _cache_data(self):
-        """Default reader to cache data from hdf5 file. 
-        
-        Works for all the 1d signals except for pinj. 
-        This function is overwritten by pinj and 2d signals
-
-        Returns
-        -------
-        data : tensor
-                        Data time series of diagnostic. dim0: samples. dim1: features
-
-        Raises
-        ------
-        ValueError
-            When the timebase can't be loaded from HDF we assume that there is no data as well.
-        """
-        # Load neutron data at t0 and t0 + 50ms. dt for this data is 50ms
-        t0_p = time.time()
-        # Don't use with... scope. This throws off dataloader
-        fp = h5py.File(join(self.datapath, f"{self.shotnr}.h5")) 
-        # Checks to make sure predictor is present
-        try:
-            tb = torch.tensor(fp[self.key]["xdata"][:])
-        except ValueError as e:
-            logging.error(f"Unable to load timebase for shot {self.shotnr} signal {self.name}")
-            raise e
-
-        # Some shots have no data for a given signal. In that case, the tensor is present in the
-        # dataset but the size is 0. Throw an error if that is the case.
-        if tb.shape[0] < 2:
-            raise ValueError(f"Shot {self.shotnr}, signal {self.key}: Timebase in HDF5 file has length {tb.shape[0]} < 2!")
-        
-        # Indices to sample on
-        t_inds = self._get_time_sampling(tb)        
-        data = torch.tensor(fp[self.key]["zdata"][:])[t_inds]
-        fp.close()
-
-        elapsed = time.time() - t0_p       
-        logging.info(f"Caching {self.name} data for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
-
-        return data.unsqueeze(1)
-
-    def __getitem__(self, key):
-        return self.data[key]
-
-    def __setitem__(self, key, value):
-        self.data[key] = value
-
-    def __repr__(self):
-        return f"signal_1d({self.data}"
+        logging.info(f"Compiled signal data for shot {shotnr}, mean={self.data_mean}, std={self.data_std}")
 
 
-class signal_pinj(signal_1d):
-    """Sum of total injected power.
-    
-        Args:
-        -----
-            name (str):
-            collect_keys (list(str))): List of datasets in the HDF5 file that will be summed to build the output signal.
-        
+class signal_ece(signal_1d):
+    """Raw ECE signals
 
-        This signal is constructed by summing over a list of neutral beam injected power time
-        series. The list of signal over which we sum is given by the collect_keys argument.
+    Returns
+    -------
+    ece_data : tensor
+                Data time series for profiles. dim0: ECE channels. dim1: samples
     """
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.name = 'pinj'
-        self.collect_keys = ["pinjf_15l", "pinjf_15r", "pinjf_21l", "pinjf_21r", 
-                             "pinjf_30l", "pinjf_30r", "pinjf_33l", "pinjf_33r"]
+    def __init__(self, shotnr, t_params, 
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu",
+                 channels=range(1,41)):
+        """
+        Unique part of constructor is channels. Can be any list of numbers from 1-40, or 
+        just an individual channel. 
+        """
+        self.channels = channels
+        self.name = 'raw ece'
         super().__init__(shotnr, t_params, datapath, device)
-    
+        
     def _cache_data(self):
-        """Load sum of all pinj from hdf5 data file.
+        """Load 2d profile from hdf5 data file.
+        
+        Assumes the xdata and zdata keys are present and data resides in the shotnr_profile.h5 files.
+        Other signals will need to override this function to cache data correctly.
         
         Returns
         -------
-        pinj_data : tensor
-                    Data time series of sum over all Pinj nodes. dim0: samples. dim1: features
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
         """
+
         t0_p = time.time()
         # Don't use with... scope. This throws off data_loader when running in threaded dataloader
         fp = h5py.File(join(self.datapath, f"{self.shotnr}.h5")) 
-        # Collect the time base using the 15l signal
-        tb = torch.tensor(fp["pinjf_15l"]["xdata"][:]) # Get time-base
+        tb = torch.tensor(fp['tecef01']["xdata"][:]) # Get time-base
+        
         t_inds = self._get_time_sampling(tb)
-        # Sum the contributions from all neutral beams specified in the collect_keys list.
-        pinj_data = sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in self.collect_keys])
+
+        # Load and stack ECE channels, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp[f"tecef{channel:02d}"]["zdata"][t_inds] for channel in self.channels], axis=1))
+        fp.close()
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading raw ECE, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
+
+
+class signal_co2_dp(signal_1d):
+    """Raw CO2 signals (change in CO2 phase data)
+
+    Returns
+    -------
+    co2_dp_data : tensor
+                Data time series for profiles. dim0: co2 signals. dim1: samples
+    """
+    def __init__(self, shotnr, t_params, 
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu",
+                 channels=['r0','v1','v2','v3']):
+        """
+        Unique part of constructor is channels. For CO2, it must be a subset (or default is all)
+        of the 4 interferometers: r0, v1, v2, and v3
+        """
+        self.channels = channels
+        self.name = 'raw co2 dp'
+        super().__init__(shotnr, t_params, datapath, device)
+        
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Assumes the xdata and zdata keys are present and data resides in the shotnr_profile.h5 files.
+        Other signals will need to override this function to cache data correctly.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_co2_dp.h5")) 
+        tb = fp["co2_time"][:] # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
+
+        # Load and stack CO2 channels, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp["dp1"+channel+"uf"]
+                                           for channel in self.channels],
+                                        axis=1)[t_inds,:] 
+                                    )
         fp.close()
 
         elapsed = time.time() - t0_p
-        logging.info(f"Caching pinj data for {self.shotnr}, t={self.tstart}-{self.tend}s took {elapsed}s")
-           
-        return pinj_data.unsqueeze(1)
+        logging.info(f"Loading raw CO2 dp, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
 
 
-class signal_tinj(signal_1d):
-    """Injected torque"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "tinj"
-        self.name = "tinj"
+class signal_co2_pl(signal_1d):
+    """Raw CO2 signals (integrated change in CO2 phase data)
+    NOTE: Not really sure what this is but this is no the same as dp signal.
+    It also may not be available real-time
+
+    Returns
+    -------
+    co2_pl_data : tensor
+                Data time series for profiles. dim0: CO2 channels. dim1: samples
+    """
+    def __init__(self, shotnr, t_params, 
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu",
+                 channels=['r0','v1','v2','v3']):
+        """
+        Unique part of constructor is channels. For CO2, it must be a subset (or default is all)
+        of the 4 interferometers: r0, v1, v2, and v3
+        """
+        self.channels = channels
+        self.name = 'raw co2 pl'
         super().__init__(shotnr, t_params, datapath, device)
+        
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Assumes the xdata and zdata keys are present and data resides in the shotnr_profile.h5 files.
+        Other signals will need to override this function to cache data correctly.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_co2_pl.h5")) 
+        tb = fp["co2_time"][:] # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
+
+        # Load and stack CO2 channels, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp["pl1"+channel+"_uf"]
+                                           for channel in self.channels],
+                                        axis=1)[t_inds,:] 
+                                    )
+        fp.close()
+
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading raw CO2 pl, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
 
 
-class signal_bmspinj(signal_1d):
-    """Injected torque"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "bmspinj"
-        self.name = "bmspinj"
+class signal_mpi(signal_1d):
+    """Raw magnetic signals
+
+    Returns
+    -------
+    mpi_data : tensor
+                Data time series for profiles. dim0: mpi66m angles. dim1: samples
+    """
+    def __init__(self, shotnr, t_params, 
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu",
+                 angles=[67,97,127,157,247,277,307,340]):
+        """
+        Unique part of constructor is angles. Must be a subset (or the default all) 
+        of the following angles: 
+        """
+        self.angles = angles
+        self.name = 'raw ece'
         super().__init__(shotnr, t_params, datapath, device)
+        
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Assumes the xdata and zdata keys are present and data resides in the shotnr_profile.h5 files.
+        Other signals will need to override this function to cache data correctly.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        
+        fp = h5py.File(join(self.datapath, "template", f"{self.shotnr}_mpi.h5")) 
+        tb = fp["times"][:] # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
+
+        # Load and stack MPI angles, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp[f"mpi66m{angle:03d}f"] 
+                                           for angle in self.angles],
+                                        axis=1)[t_inds,:]
+                                    )
+        fp.close()
+
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading raw MPI, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
 
 
-class signal_bmstinj(signal_1d):
-    """Injected torque"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "bmstinj"
-        self.name = "bmstinj"
+class signal_BES(signal_1d):
+    """Raw BES signals
+
+    Returns
+    -------
+    bes_data : tensor
+                Data time series for profiles. dim0: BES channels. dim1: samples
+    """
+    def __init__(self, shotnr, t_params, 
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu",
+                 channels=range(1,65)):
+        """
+        Unique part of constructor is channels. Can be any list of numbers from 1-64, or 
+        just an individual channel. 
+        """
+        self.channels = channels
+        self.name = 'raw BES'
         super().__init__(shotnr, t_params, datapath, device)
+        
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Assumes the xdata and zdata keys are present and data resides in the shotnr_profile.h5 files.
+        Other signals will need to override this function to cache data correctly.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        
+        fp = h5py.File(join(self.datapath, f"{self.shotnr}_BES.h5")) 
+        tb = fp["times"][:] # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
+
+        # Load and stack BES channels, slicing happens in for loop to avoid loading data that would then be cut
+        prof_data = torch.tensor(np.stack([fp[f"BESFU{channel:02d}"]
+                                           for channel in self.channels],
+                                        axis=1)[t_inds,:] 
+                                    )
+        fp.close()
+
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading raw BES, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
 
 
-class signal_neut(signal_1d):
-    """Neutrons rate 1d signal"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "neutronsrate"
-        self.name = "neutronsrate"
+class signal_uci_label(signal_1d):
+    """ Bill's AE labels. These are approximate as he only labeled a single time, 
+    so we take assume AE mode happens in window +-250ms around labeled time. 
+
+    Returns
+    -------
+    uci_label_data : tensor
+                Data time series for profiles. dim0: AE modes. dim1: samples
+                Order of AE modes is: BAAE, BAE, EAE, RSAE, TAE
+    """
+    def __init__(self, shotnr, t_params, 
+                 datapath="/projects/EKOLEMEN/d3dloader", device="cpu"):
+        
+        self.name = 'UCI approximate AE labels'
         super().__init__(shotnr, t_params, datapath, device)
+        
+    def _cache_data(self):
+        """Load 2d profile from hdf5 data file.
+        
+        Returns
+        -------
+        prof_data : tensor
+                    Data time series for profiles. dim0: samples. dim1: features (channels)
+        """
+
+        t0_p = time.time()
+        # Don't use with... scope. This throws off data_loader when running in threaded dataloader
+        
+        fp = h5py.File(join(self.datapath, f"{self.shotnr}_uci_label.h5")) 
+        tb = fp["times"][:] # Get time-base
+        
+        t_inds = self._get_time_sampling(tb)
+
+        # Load AE modes and slice time array
+        prof_data = torch.tensor(fp['label'][t_inds,:])
+        fp.close()
+
+        elapsed = time.time() - t0_p
+        logging.info(f"Loading UCI AE labels, t={self.tstart}-{self.tend}s took {elapsed}s")
+        
+        # NOTE: unsqueeze(1) not needed even if there's only 1 channel 
+        return prof_data
 
 
-class signal_iptipp(signal_1d):
-    """Target current"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "iptipp"
-        self.name = "iptipp"
-        super().__init__(shotnr, t_params, datapath, device)
-
-
-class signal_dstdenp(signal_1d):
-    """Target density"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "dstdenp"
-        self.name = "dstdenp"
-        super().__init__(shotnr, t_params, datapath, device)
-
-
-class signal_dssdenest(signal_1d):
-    """Line-averaged density"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "dssdenest"
-        self.name = "dssdenest"
-        super().__init__(shotnr, t_params, datapath, device)
-
-
-class signal_ip(signal_1d):
-    """Injected power 1d signal"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "ip"
-        self.name = "ip"
-        super().__init__(shotnr, t_params, datapath, device)
-
-
-class signal_betan(signal_1d):
-    """Injected power 1d signal"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "betan"
-        self.name = "betan"
-        super().__init__(shotnr, t_params, datapath, device)
-
-
-
-class signal_doutl(signal_1d):
-    """Lower triangularity shape profile"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "doutl"
-        self.name = "lower triangularity"
-        super().__init__(shotnr, t_params, datapath, device)
-
-
-class signal_doutu(signal_1d):
-    """Upper triangularity shape profile"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "doutu"
-        self.name = "upper triangularity"
-        super().__init__(shotnr, t_params, datapath, device)
-
-class signal_tritop(signal_1d):
-    """Lower triangularity shape profile"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "tritop"
-        self.name = "lower triangularity"
-        super().__init__(shotnr, t_params, datapath, device)
-
-
-class signal_tribot(signal_1d):
-    """Upper triangularity shape profile"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "tribot"
-        self.name = "lower triangularity"
-        super().__init__(shotnr, t_params, datapath, device)
-
-
-class signal_ech(signal_1d):
-    """ECH 1d signal. Uses the corrected echpwrc pointname"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "echpwrc"
-        self.name = "ECH"
-        super().__init__(shotnr, t_params, datapath, device)
-
-
-class signal_q95(signal_1d):
-    """q95 value - 1d signal"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "q95"
-        self.name = "q95"
-        super().__init__(shotnr, t_params, datapath, device)
+class signal_ece_spec(signal_1d):
+    """_summary_
     
-    
-class signal_kappa(signal_1d):
-    """Shape 1d signal Kappa"""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMEN/d3d_loader", device="cpu"):
-        self.key = "kappa"
-        self.name = "kappa"
-        super().__init__(shotnr, t_params, datapath, device)
+    """
+    def _cache_data(self):
+        # Fill in later
+        pass
 
-class signal_pcbcoil(signal_1d):
-    """PCBcoil signal."""
-    def __init__(self, shotnr, t_params, datapath="/projects/EKOLEMENT/d3d_loader", device="cpu"):
-        self.key = "pcbcoil"
-        self.name = "pcbcoil"
-        super().__init__(shotnr, t_params, datapath, device)
+
+class signal_co2_spec(signal_1d):
+    """_summary_
+
+    """
+    def _cache_data(self):
+        # Fill in later
+        pass
+
