@@ -8,8 +8,13 @@ import time
 import numpy as np
 import h5py
 import torch
+import yaml
 
 import logging
+
+import importlib.resources
+
+
 
 class signal_base():
     """Base class for a sample.
@@ -20,7 +25,7 @@ class signal_base():
 
 
     """
-    def __init__(self, shotnr, time_sampler, standardizer, datapath, device):
+    def __init__(self, shotnr, time_sampler, standardizer, datapath, device=torch.device("cpu")):
         """Load data from HDF5 file, standardize, and move to device.
 
         Parameters
@@ -144,27 +149,14 @@ class signal_pinj(signal_base):
            
         return pinj_data.unsqueeze(1)
 
-class signal_pradcore(signal_base):
-    """Core radiation."""
-    def __init__(self, shotnr, time_sampler, std, datapath, device):
-        # key and name are different. signal_factory has not been generalized to this yet.
-        self.key = "bol_l03_p"
-        self.name = "pradcore"
-        super().__init__(shotnr, time_sampler, std, datapath, device)
 
-
-class signal_pradedge(signal_base):
-    """Core radiation."""
-    def __init__(self, shotnr, time_sampler, std, datapath, device):
-        # key and name are different. signal_factory has not been generalized to this yet.
-        self.key = "bol_l15_p"
-        self.name = "pradedge"
-        super().__init__(shotnr, time_sampler, std, datapath, device)
-
-
-
-def signal_factory(name, base_class=signal_base):
+def signal_factory(full_name):
     """Create a signal for arbitrary names.
+    
+    Args:
+        full_name (str) : Name of the signal. Needs to begin with "signal_"
+        base_class (type) : Needs 
+    
     See https://stackoverflow.com/questions/15247075/how-can-i-dynamically-create-derived-classes-from-a-base-class
 
     This works like this:
@@ -172,14 +164,27 @@ def signal_factory(name, base_class=signal_base):
     >>> efsli = signal_efsli(shotnr, sampler_causal(100.0, 1000.0, 1.0), std, datapath, "cpu")
     >>> plt.plot(np.arange(100.0, 1000.0, 1.0), efsli.data[:,0].numpy())
 
+    When dispatching to HDF5, the signal class will use self.key to access the relevant 
+    data group. This key is taken from the signal definition signals_0d.yaml
+
     """
-        # Define __init__ function for new signal
+    assert(full_name[:7] == "signal_")
+    short_name = full_name[7:]   # The part after signal_
+
+    # Access signal definition from yaml files: 
+    # https://stackoverflow.com/questions/72886257/why-use-importlib-resources-over-file
+    # Use importlib to guarantee path safety
+    resource_path = importlib.resources.files("d3d_signals")
+    with open(join(resource_path, "signals_0d.yaml"), "r") as fp:
+        signals_0d = yaml.safe_load(fp)
+   
+    # Define __init__ function for new signal
     def __init__(self, shotnr, time_sampler, std, datapath, device):
-        self.key = name[len("signal_"):]
-        self.name = name[len("signal_"):]
+        self.name = short_name
+        self.key = signals_0d[short_name]["map_to"]
         
-        signal_base.__init__(self, shotnr, time_sampler, std, datapath, device)
+        signal_base.__init__(self, shotnr, time_sampler, std, datapath, device=torch.device("cpu"))
         
-    newclass = type(name, (signal_base, ), {"__init__": __init__})
+    newclass = type(full_name, (signal_base, ), {"__init__": __init__})
     return newclass
 

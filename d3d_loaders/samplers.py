@@ -49,7 +49,7 @@ class SequentialSampler(Sampler):
             yield [range(start, start + self.seq_length + 1)]
 
 class collate_fn_seq():
-    r"""Functor to be used in DtaLoader with SequentialSampler.
+    r"""Functor to be used in DataLoader with SequentialSampler.
 
     ```
     >>> loader_train_seq = torch.utils.data.DataLoader(ds, num_workers=0, 
@@ -70,51 +70,41 @@ class collate_fn_seq():
         return samples[0]
 
 
-class SequentialSampler(Sampler[int]):
-    r"""Samples sequences in-order
+# class SequentialSampler(Sampler[int]):
+#     r"""Samples sequences in-order
     
-    Given a dataset of length N, this sampler will generate (N-seq_length-1)
-    sequences of length (seq_length + 1). The starting index of these
-    (N - seq_length - 1) sequences is in order.
+#     Given a dataset of length N, this sampler will generate (N-seq_length-1)
+#     sequences of length (seq_length + 1). The starting index of these
+#     (N - seq_length - 1) sequences is in order.
     
-    # Generate sequences of length 3, as to cover [0, 1, 2, 3, 4, 5]
-    >>> my_sampler = SequentialSampler(6, 2)
-    >>> for s in my_sampler:
-    >>>     print(s)
-    [range(0, 3)]
-    [range(1, 4)]
-    [range(2, 5)]
+#     # Generate sequences of length 3, as to cover [0, 1, 2, 3, 4, 5]
+#     >>> my_sampler = SequentialSampler(6, 2)
+#     >>> for s in my_sampler:
+#     >>>     print(s)
+#     [range(0, 3)]
+#     [range(1, 4)]
+#     [range(2, 5)]
 
 
-    In the output above, the first sequence of length (2 + 1) starts at 0: range(0,3) = [0, 1, 2].
-    The second sequence of length (2 + 1) starts at 1: range(1, 4) = [1, 2, 3].
+#     In the output above, the first sequence of length (2 + 1) starts at 0: range(0,3) = [0, 1, 2].
+#     The second sequence of length (2 + 1) starts at 1: range(1, 4) = [1, 2, 3].
     
-    Thus, we have exhausted the possibility of many-to-one mappings of the kind:
+#     Thus, we have exhausted the possibility of many-to-one mappings of the kind:
     
-    f(x_{i}, x_{i+1}, ..., x_{i + seq_length - 1}) -> y_{i + seq_length}
+#     f(x_{i}, x_{i+1}, ..., x_{i + seq_length - 1}) -> y_{i + seq_length}
     
-    Args:
-        ds_length: Length of the dataset.
-        seq_length: Length of the sequence
-    """ 
-    def __init__(self, ds_length, seq_length):
-        self.ds_length = ds_length # Length of the dataset
-        self.seq_length = seq_length # Length of the sequences to sample
+#     Args:
+#         ds_length: Length of the dataset.
+#         seq_length: Length of the sequence
+#     """ 
+#     def __init__(self, ds_length, seq_length):
+#         self.ds_length = ds_length # Length of the dataset
+#         self.seq_length = seq_length # Length of the sequences to sample
         
-    def __iter__(self):
-        """Returns fixed-length, ordered sequences that cover the dataset."""
-        for start in range(self.ds_length - self.seq_length - 1):
-            yield [range(start, start + self.seq_length + 1)]
-
-
-class collate_fn_random_batch_seq():
-    def __init__(self, batch_size):
-        self.batch_size = batch_size
-        
-    def __call__(self, x):
-        x = x[0]
-        #print(f"__call__ len(x) = {len(x)}, type(x[0]) = {type(x[0])}, x[0].shape = {x[0].shape}")
-        return x[0].reshape(self.batch_size, -1, x[0].shape[-1]), x[1].reshape(self.batch_size, -1, x[1].shape[-1])
+#     def __iter__(self):
+#         """Returns fixed-length, ordered sequences that cover the dataset."""
+#         for start in range(self.ds_length - self.seq_length - 1):
+#             yield [range(start, start + self.seq_length + 1)]
 
 
 class SequentialSamplerBatched(Sampler):
@@ -151,8 +141,8 @@ class collate_fn_seq_batched():
         None
         
     def __call__(self, samples):
-        x_stacked = torch.cat([s[0][:, None, :] for s in samples], dim=1)
-        y_stacked = torch.cat([s[1][:, None, :] for s in samples], dim=1)
+        x_stacked = torch.cat([s[0][None, :, :] for s in samples], dim=0)
+        y_stacked = torch.cat([s[1][None, :, :] for s in samples], dim=0)
         return x_stacked, y_stacked
 
 
@@ -235,31 +225,43 @@ class RandomBatchSequenceSampler(Sampler[int]):
     indices: Sequence[int]
 
     def __init__(self, num_elements: int, seq_length: int, batch_size: int) -> None:
-        self.indices = range(num_elements)
-        self.seq_length = seq_length
-        self.batch_size = batch_size
+        self.num_elements = num_elements    # Number of elements in the sequence we want to sample
+        self.seq_length = seq_length        # Length of the sequence we want to sample
+        self.batch_size = batch_size        # Batch size
         
-        print(f"__init__() indices={self.indices}, seq_length={self.seq_length}, batch_size={self.batch_size}")
-
         if self.batch_size >= num_elements:
             raise ValueError("Batch size must be smaller than the size of the dataset. ")
 
     def __iter__(self) -> Iterator[int]:
         """Returns a batch of fixed length sequences, starting at random."""
-        # Define random starting indices of the sequence
-        # idx_permuted = torch.randperm(len(self.indices) - self.seq_length)
-        # print(f"idx_permuted = {idx_permuted}, size = {idx_permuted.shape}")
-        # print(f"batch_size = {self.batch_size}")
-        idx_permuted = list(range(len(self.indices) - self.seq_length))
+        # Define random starting indices of the sequence. Remember sequence length = self.seq_length + 1.
+        idx_permuted = list(range(self.num_elements - self.seq_length - 1))
         random.shuffle(idx_permuted)
-        # Number of batches to draw. Round up.
-        num_batches = (len(self.indices) - self.seq_length) // self.batch_size
+        # Number of batches to draw. Round down
+        num_batches = (self.num_elements - self.seq_length - 1) // self.batch_size
         for ix_b in range(0, num_batches):
             # draw (batch_size) starting indices
             ix_start = idx_permuted[(ix_b * self.batch_size):((ix_b + 1) * self.batch_size)]
             # Return a list of tensors, so that the entire tensor is passed to dataset.__idx__:
             # See call for map-style datasets in code example here: https://pytorch.org/docs/stable/data.html#automatic-batching-default
             yield [torch.cat([torch.arange(i, i + self.seq_length + 1) for i in ix_start])]
+
+
+class collate_fn_random_batch_seq():
+    """Reshape output returned by RandomBatchSequenceSampler.
+
+    Output has shape (N, L, H), corresponding to batch_first=True in
+    https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html
+    """
+    def __init__(self, batch_size):
+        self.batch_size = batch_size
+        
+    def __call__(self, x):
+        x = x[0]
+        # Unpack the stacked indices from RandomBatchSequenceSampler.__iter__
+        x_stacked = x[0].reshape(self.batch_size, -1, x[0].shape[-1])
+        y_stacked = x[1].reshape(self.batch_size, -1, x[1].shape[-1])
+        return x_stacked, y_stacked
 
 
 class RandomBatchSequenceSampler_multishot():
@@ -280,7 +282,7 @@ class RandomBatchSequenceSampler_multishot():
 
     def __init__(self, num_shots:int, num_elements: int, seq_length: int, batch_size: int) -> None:
         self.num_shots = num_shots
-        self.indices = range(num_elements)
+        self.num_elements = num_elements
         self.seq_length = seq_length
         self.batch_size = batch_size
         
@@ -292,11 +294,11 @@ class RandomBatchSequenceSampler_multishot():
     def __iter__(self): # -> Iterator[int]:
         """Returns a batch of fixed length sequences, starting at random."""
         # Randomly shuffle starting indices for each shot
-        idx_permuted = [(s, i) for i in range(len(self.indices) - self.seq_length) for s in range(self.num_shots)]
+        idx_permuted = [(s, i) for i in range(self.num_elements - self.seq_length) for s in range(self.num_shots)]
         random.shuffle(idx_permuted)
 
         # Number of batches to draw. Round up.
-        num_batches = self.num_shots * (len(self.indices) - self.seq_length) // self.batch_size
+        num_batches = self.num_shots * (self.num_elements - self.seq_length) // self.batch_size
         for ix_b in range(0, num_batches):
             # Select starting points for sequences
             selected = idx_permuted[(ix_b * self.batch_size):((ix_b + 1) * self.batch_size)]

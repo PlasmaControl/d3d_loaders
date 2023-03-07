@@ -85,15 +85,13 @@ class D3D_dataset(torch.utils.data.Dataset):
         logging.info("----Building predictor signals")
         for pred_name in predictors:
             logging.info(f"Adding {pred_name} to predictor list.")
+            # There are some signals that have a custom constructor.
             if pred_name == "pinj":
-                self.predictors[pred_name] = signal_pinj(shotnr, self.sampler_pred, self.standardizer_dict[pred_name], self.datapath, device)
-            elif pred_name == "pradcore":
-                self.predictors[pred_name] = signal_pradcore(shotnr, self.sampler_pred, self.standardizer_dict[pred_name], self.datapath, device)
-            elif pred_name == "pradedge":
-                self.predictors[pred_name] = signal_pradedge(shotnr, self.sampler_pred, self.standardizer_dict[pred_name], self.datapath, device)
+                self.predictors[pred_name] = signal_pinj(shotnr, self.sampler_pred, self.standardizer_dict[pred_name], self.datapath, self.device)
+            # For all other signals, use the signal factory
             else: 
-                new_signal = signal_factory(f"signal_{pred_name}", signal_base)
-                self.predictors[pred_name] = new_signal(shotnr, self.sampler_pred, self.standardizer_dict[pred_name], self.datapath, device)
+                new_signal = signal_factory(f"signal_{pred_name}")
+                self.predictors[pred_name] = new_signal(shotnr, self.sampler_pred, self.standardizer_dict[pred_name], self.datapath, self.device)
 
             
         logging.info("----Building target signals")
@@ -101,18 +99,18 @@ class D3D_dataset(torch.utils.data.Dataset):
             logging.info(f"Adding {target_name} to target list.")
 
             if target_name == "ae_prob_delta":
-                self.targets[target_name] = signal_ae_prob_delta(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device)
+                self.targets[target_name] = signal_ae_prob_delta(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], self.datapath, self.device)
             elif target_name == "uci_label":
-                self.targets[target_name] = signal_uci_label(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device)
+                self.targets[target_name] = signal_uci_label(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], self.datapath, self.device)
             elif target_name == "ae_prob":
-                self.targets[target_name] = signal_ae_prob(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device)
+                self.targets[target_name] = signal_ae_prob(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], self.datapath, self.device)
             elif target_name == "AE_predictions":
-                self.targets[target_name] = signal_AE_pred(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device)
+                self.targets[target_name] = signal_AE_pred(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], self.datapath, self.device)
             elif target_name == "betan":
-                self.targets[target_name] = signal_betan(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device)
+                self.targets[target_name] = signal_betan(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], self.datapath, self.device)
             # Add other targets here
             elif target_name == "ttd":
-                self.targets[target_name] = target_ttd(shotnr, self.sampler_targ, datapath=self.datapath, device)
+                self.targets[target_name] = target_ttd(shotnr, self.sampler_targ, self.datapath, self.device)
             else:
                 raise(ValueError(f'{target_name} is not a valid target'))
 
