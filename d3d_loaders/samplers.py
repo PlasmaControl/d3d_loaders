@@ -48,6 +48,7 @@ class SequentialSampler(Sampler):
         for start in range(self.ds_length - self.seq_length - 1):
             yield [range(start, start + self.seq_length + 1)]
 
+
 class collate_fn_seq():
     r"""Functor to be used in DataLoader with SequentialSampler.
 
@@ -61,7 +62,6 @@ class collate_fn_seq():
         torch.Size([513, 11]) torch.Size([513, 5])
         ...
     ```
-
     """
     def __init__(self):
         None
@@ -70,44 +70,7 @@ class collate_fn_seq():
         return samples[0]
 
 
-# class SequentialSampler(Sampler[int]):
-#     r"""Samples sequences in-order
-    
-#     Given a dataset of length N, this sampler will generate (N-seq_length-1)
-#     sequences of length (seq_length + 1). The starting index of these
-#     (N - seq_length - 1) sequences is in order.
-    
-#     # Generate sequences of length 3, as to cover [0, 1, 2, 3, 4, 5]
-#     >>> my_sampler = SequentialSampler(6, 2)
-#     >>> for s in my_sampler:
-#     >>>     print(s)
-#     [range(0, 3)]
-#     [range(1, 4)]
-#     [range(2, 5)]
-
-
-#     In the output above, the first sequence of length (2 + 1) starts at 0: range(0,3) = [0, 1, 2].
-#     The second sequence of length (2 + 1) starts at 1: range(1, 4) = [1, 2, 3].
-    
-#     Thus, we have exhausted the possibility of many-to-one mappings of the kind:
-    
-#     f(x_{i}, x_{i+1}, ..., x_{i + seq_length - 1}) -> y_{i + seq_length}
-    
-#     Args:
-#         ds_length: Length of the dataset.
-#         seq_length: Length of the sequence
-#     """ 
-#     def __init__(self, ds_length, seq_length):
-#         self.ds_length = ds_length # Length of the dataset
-#         self.seq_length = seq_length # Length of the sequences to sample
-        
-#     def __iter__(self):
-#         """Returns fixed-length, ordered sequences that cover the dataset."""
-#         for start in range(self.ds_length - self.seq_length - 1):
-#             yield [range(start, start + self.seq_length + 1)]
-
-
-class SequentialSamplerBatched(Sampler):
+class SequentialBatchedSampler(Sampler):
     r"""Sample linear sequences in order, allows for batching.
 
     Similar to SequentialSampler, but returns a batch of sequences in each iteration.
@@ -146,11 +109,17 @@ class collate_fn_seq_batched():
         return x_stacked, y_stacked
 
 
-class SequentialSamplerBatched_multi(Sampler):
-    r"""Sample batched, linear sequences from multishot dataset."""
-    def __init__(self, num_shots:int, num_elements: int, seq_length: int, batch_size: int) -> None:
-        self.num_shots = num_shots
+class SequentialBatchedSampler_multi(Sampler):
+    r"""Sample batched, linear sequences from multishot dataset.
+    
+    Args:
+        num_elements (List[Int]): Elements per dataset.
+        seq_length (Int) : Length of sequences to sample
+        batch_size (Int) : Number of sequences to return per iteration.
+    """
+    def __init__(self, num_elements, seq_length, batch_size):
         self.num_elements = num_elements
+        self.num_shots = len(num_elements)
         self.seq_length = seq_length
         self.batch_size = batch_size
 
@@ -161,14 +130,11 @@ class SequentialSamplerBatched_multi(Sampler):
           requested batch_size, before continuing on the next shot.
         """
         for s in range(0, self.num_shots):
-            for start in range(0, self.num_elements - self.seq_length - 1, self.batch_size):
-                yield [(s, range(start + b, start + b + self.seq_length + 1)) for b in range(self.batch_size) if start + b + self.seq_length + 1 <= self.num_elements]
+            for start in range(0, self.num_elements[s] - self.seq_length - 1, self.batch_size):
+                yield [(s, range(start + b, start + b + self.seq_length + 1)) for b in range(self.batch_size) if start + b + self.seq_length + 1 <= self.num_elements[s]]
         
 
-
-
-
-class RandomSequenceSampler(Sampler[int]):
+class RandomSampler(Sampler[int]):
     r"""Samples sequences randomly, without replacement.
     
     Given a dataset of length N, this sampler will generate (N-seq_length-1)
@@ -217,7 +183,7 @@ class RandomSequenceSampler(Sampler[int]):
         return len(self.indices)
 
 
-class RandomBatchSequenceSampler(Sampler[int]):
+class RandomBatchedSampler(Sampler[int]):
     r"""Randomly samples batched sequences without replacement.
 
     """
@@ -264,16 +230,15 @@ class collate_fn_random_batch_seq():
         return x_stacked, y_stacked
 
 
-class RandomBatchSequenceSampler_multishot():
+class RandomBatchedSampler_multishot():
     r"""Randomly samples batched sequences from multi-shot dataset without replacement.
     
-    Works similar to RandomBatchSequenceSampler, but spreads sampling out over multiple datasets.
+    Works similar to RandomBatchedSampler, but spreads sampling out over multiple datasets.
     
     Args:
         num_elements (List[Int]): Elements per dataset.
         seq_length (Int) : Length of sequences to sample
         batch_size (Int) : Number of sequences to return per iteration.
-
     """
     def __init__(self, num_elements, seq_length, batch_size):
         self.num_elements = num_elements
@@ -324,12 +289,13 @@ class RandomBatchSequenceSampler_multishot():
 
 
 class collate_fn_random_batch_seq_multi():
-    r"""Stacks samples from RandomBatchSequenceSampler_multishot into single tensors.
+    r"""Stacks samples from RandomBatchedSampler_multishot into single tensors.
     Output should have shape (L, N, H), batch_first=False:
     https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html
     """
-    def __init__(self, batch_size):
-        self.batch_size = batch_size
+    def __init__(self):
+        #self.batch_size = batch_size
+        pass
         
     def __call__(self, samples):
         x_stacked = torch.cat([s[0][:, None, :] for s in samples], dim=1)

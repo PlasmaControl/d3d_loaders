@@ -29,6 +29,8 @@ class target_ttd():
 
         tb, target = self._cache_data()
         data = self.time_sampler.resample(tb, target)
+        # Convert back to torch, since the sampler uses numpy/scipy arrays.
+        # Un-squeeze observation dimension
         self.data = torch.tensor(data).unsqueeze(1).to(device)
 
     def _cache_data(self):

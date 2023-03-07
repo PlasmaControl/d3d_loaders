@@ -85,7 +85,7 @@ class sampler_linearip(sampler_base):
         super(sampler_linearip, self).__init__(t_start, t_end, dt, t_shift)
         self.tb_new = np.arange(t_start - t_shift, t_end - t_shift, dt)
 
-    def resample(self, tb, signal):
+    def resample(self, tb, signal, dtype=np.float32):
         """Interpolate signal on new timebase."""
         # Convert to numpy so we got interpolate.interp1d working
         if isinstance(signal, torch.Tensor):
@@ -97,7 +97,9 @@ class sampler_linearip(sampler_base):
         #print("resample, tb = ", tb, ", tb_new = ", self.tb_new)
         f = interpolate.interp1d(tb, signal)
         sig_rs = f(self.tb_new)
-        return sig_rs
+        # Somewhere in this routine, float32 (input) gets converted to float64.
+        # Enforce output type here.
+        return sig_rs.astype(dtype)
 
     def __repr__(self):
         return f"sampler_linearip: {self.t_start}, {self.t_end}, {self.dt}), shift={self.t_shift}ms"
