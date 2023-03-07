@@ -268,20 +268,16 @@ class RandomBatchSequenceSampler_multishot():
     r"""Randomly samples batched sequences from multi-shot dataset without replacement.
     
     Works similar to RandomBatchSequenceSampler, but spreads sampling out over multiple datasets.
-    As of now (2023-02), all datasets have to have the same length.
     
     Args:
         num_elements (List[Int]): Elements per dataset.
-        seq_length: Length of sequences to sample
-        batch_size: Number of sequences to return per iteration.
+        seq_length (Int) : Length of sequences to sample
+        batch_size (Int) : Number of sequences to return per iteration.
 
     """
-
-    #indices: Sequence[int]
-
-    def __init__(self, num_shots:int, num_elements: int, seq_length: int, batch_size: int) -> None:
-        self.num_shots = num_shots
+    def __init__(self, num_elements, seq_length, batch_size):
         self.num_elements = num_elements
+        self.num_shots = len(num_elements)
         self.seq_length = seq_length
         self.batch_size = batch_size
         
@@ -291,14 +287,33 @@ class RandomBatchSequenceSampler_multishot():
     def __iter__(self): # -> Iterator[int]:
         """Returns a batch of fixed length sequences, starting at random."""
         # Randomly shuffle starting indices for each shot
-        idx_permuted = [(s, i) for i in range(self.num_elements - self.seq_length) for s in range(self.num_shots)]
+        idx_permuted = [(s, i)  for s in range(self.num_shots) for i in range(self.num_elements[s] - self.seq_length)]
+        #idx_permuted = [(s, i) for s in range(num_shots) for i in range(num_elements[s] - seq_length) ]
         random.shuffle(idx_permuted)
 
+        
+        full_batches = len(idx_permuted) // self.batch_size # Number of batches we can fill with the specified batch size
+        # Check if the last batch is full or partial
+        # We iterate up to num_batches. If in the loop the batch_counter == full_batches, we will have a partial patch
+        if len(idx_permuted) != full_batches * self.batch_size:
+            remaining_samples = len(idx_permuted) - full_batches * self.batch_size
+            partial_batch = True
+            num_batches = full_batches + 1
+        else: 
+            partial_batch = False
+            num_batches = full_batches
+     
         # Number of batches to draw. Round up.
-        num_batches = self.num_shots * (self.num_elements - self.seq_length) // self.batch_size
+        #num_batches = self.num_shots * (self.num_elements - self.seq_length) // self.batch_size
         for ix_b in range(0, num_batches):
-            # Select starting points for sequences
-            selected = idx_permuted[(ix_b * self.batch_size):((ix_b + 1) * self.batch_size)]
+            # If ix_x is full_batches (remember 0-based indexing and num_batches is excludede in range)
+            # we have need to fill a partial batch with the remaining samples.
+            if ix_b == full_batches:  
+                selected = idx_permuted[-remaining_samples:]
+            else:
+                # Fill a full batch
+                # Select starting points for sequences
+                selected = idx_permuted[(ix_b * self.batch_size):((ix_b + 1) * self.batch_size)]
             # Remember to return a list. PyTorch dataloader passes each item in the
             # returned list to dataset.__getidx__. If we only return a single list,
             # each scalar index in that list would be passed to __getidx__.
