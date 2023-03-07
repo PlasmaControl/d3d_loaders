@@ -14,7 +14,7 @@ class target_ttd():
 
     Things like time-to-disruption, time-to-ELM, etc.
     """
-    def __init__(self, shotnr, time_sampler, datapath, device):
+    def __init__(self, shotnr, time_sampler, datapath, device=torch.device("cpu")):
         """Load target from HDF5 file, resample move to device.
 
         Parameters:
@@ -28,7 +28,8 @@ class target_ttd():
         self.datapath = datapath
 
         tb, target = self._cache_data()
-        self.data = self.time_sampler.resample(tb, target)
+        data = self.time_sampler.resample(tb, target)
+        self.data = torch.tensor(data).unsqueeze(1).to(device)
 
     def _cache_data(self):
         """Fetchd data from HDF5. """
