@@ -26,8 +26,8 @@ class D3D_dataset(torch.utils.data.Dataset):
                  sampler_pred,
                  sampler_targ,
                  standardizer_dict,
-                 datapath="/projects/EKOLEMEN/aza_lenny_data1",
-                 device="cpu"):
+                 datapath,
+                 device=torch.device("cpu")):
         """Initializes the dataloader for DIII-D data.
 
         Parameters
@@ -43,7 +43,7 @@ class D3D_dataset(torch.utils.data.Dataset):
             Provides a uniform time sampler for each predictor
 
         sampler_targ : class `sampler_base`
-            Time sampler for targets.
+            Time sampler for targets. May be different to allow time shifting etc.
 
         standardizer_dict : dict {name : class `standardizer`}
             Provides individual standardizer for each predictor/target
@@ -101,18 +101,18 @@ class D3D_dataset(torch.utils.data.Dataset):
             logging.info(f"Adding {target_name} to target list.")
 
             if target_name == "ae_prob_delta":
-                self.targets[target_name] = signal_ae_prob_delta(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device=device)
+                self.targets[target_name] = signal_ae_prob_delta(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device)
             elif target_name == "uci_label":
-                self.targets[target_name] = signal_uci_label(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device=device)
+                self.targets[target_name] = signal_uci_label(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device)
             elif target_name == "ae_prob":
-                self.targets[target_name] = signal_ae_prob(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device=device)
+                self.targets[target_name] = signal_ae_prob(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device)
             elif target_name == "AE_predictions":
-                self.targets[target_name] = signal_AE_pred(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device=device)
+                self.targets[target_name] = signal_AE_pred(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device)
             elif target_name == "betan":
-                self.targets[target_name] = signal_betan(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device=device)
+                self.targets[target_name] = signal_betan(shotnr, self.sampler_targ, self.standardizer_dict[pred_name], datapath=self.datapath, device)
             # Add other targets here
             elif target_name == "ttd":
-                self.targets[target_name] = target_ttd(shotnr, self.sampler_targ, datapath=self.datapath, device=device)
+                self.targets[target_name] = target_ttd(shotnr, self.sampler_targ, datapath=self.datapath, device)
             else:
                 raise(ValueError(f'{target_name} is not a valid target'))
 

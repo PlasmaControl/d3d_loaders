@@ -1,0 +1,3 @@
+[submodule "d3d_signals"]
+	path = d3d_signals
+	url = https://github.com/PlasmaControl/d3d_signals
