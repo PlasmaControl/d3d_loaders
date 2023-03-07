@@ -187,16 +187,20 @@ class Multishot_dataset():
         datapath: string
         device: torch.device
     """
-    def __init__(self, shotlist, t_params, predictors, targets, shift_targets, datapath, device):
+    def __init__(self, shotlist, predictors, targets, sampler_pred_dict, sampler_targ_dict, std_dict, datapath, device=torch.device("cpu")):
         # Create list of D3D_datasets
-        self.datasets = [D3D_dataset(shotnr, t_params, predictors, targets, shift_targets, datapath, device) for shotnr in shotlist]
+        self.datasets = []
+        for shotnr in shotlist:
+            self.datasets.append(D3D_dataset(shotnr, predictors, targets, sampler_pred_dict[shotnr], 
+                                 sampler_targ_dict[shotnr], std_dict, datapath, device))
+        
         
     def shot(self, idx: int):
         r"""Quick access to individual shot"""
         return self.datasets[idx]
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.datasets)
         
     def __getitem__(self, idx):
         """Fetch data from random dataset.

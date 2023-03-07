@@ -94,13 +94,13 @@ class sampler_linearip(sampler_base):
         if isinstance(tb, torch.Tensor):
             tb = tb.numpy()
 
-        print(f"tb = {tb}")
-        print(f"signal = {signal}")
-
-
+        #print("resample, tb = ", tb, ", tb_new = ", self.tb_new)
         f = interpolate.interp1d(tb, signal)
         sig_rs = f(self.tb_new)
         return sig_rs
+
+    def __repr__(self):
+        return f"sampler_linearip: {self.t_start}, {self.t_end}, {self.dt}), shift={self.t_shift}ms"
 
 
 

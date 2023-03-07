@@ -35,7 +35,7 @@ class target_ttd():
         """Fetchd data from HDF5. """
         fp = h5py.File(join(self.datapath, f"{self.shotnr}.h5"), "r")
         try:
-            tb = torch.tensor(fp["/target_ttd"]["xdata"][:])
+            tb = torch.tensor(fp["target_ttd"]["xdata"][:])
         except ValueError as e:
             fp.close()
             logging.error(f"Unable to load timebase for shot {self.shotnr} for target_ttd")
@@ -45,7 +45,7 @@ class target_ttd():
             fp.close()
             raise ValueError(f"Shot {self.shotnr}, target_ttd: Timebase in HDF5 file has length {tb.shape[0]} < 2!")    
         
-        target = torch.tensor(fp["/target_ttd"]["zdata"][:])
+        target = torch.tensor(fp["target_ttd"]["zdata"][:])
         fp.close()
 
         return tb, target

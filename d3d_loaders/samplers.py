@@ -271,8 +271,7 @@ class RandomBatchSequenceSampler_multishot():
     As of now (2023-02), all datasets have to have the same length.
     
     Args:
-        num_shots: Number of shots in the dataset
-        num_elements: Elements per dataset. All have equal size
+        num_elements (List[Int]): Elements per dataset.
         seq_length: Length of sequences to sample
         batch_size: Number of sequences to return per iteration.
 
@@ -286,9 +285,7 @@ class RandomBatchSequenceSampler_multishot():
         self.seq_length = seq_length
         self.batch_size = batch_size
         
-        # print(f"__init__() indices={self.indices}, seq_length={self.seq_length}, batch_size={self.batch_size}")
-
-        if self.batch_size >= num_elements:
+        if self.batch_size >= min(num_elements):
             raise ValueError("Batch size must be smaller than the size of the dataset. ")
 
     def __iter__(self): # -> Iterator[int]:
@@ -312,7 +309,10 @@ class RandomBatchSequenceSampler_multishot():
 
 
 class collate_fn_random_batch_seq_multi():
-    r"""Stacks samples from RandomBatchSequenceSampler_multishot into single tensors."""
+    r"""Stacks samples from RandomBatchSequenceSampler_multishot into single tensors.
+    Output should have shape (L, N, H), batch_first=False:
+    https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html
+    """
     def __init__(self, batch_size):
         self.batch_size = batch_size
         
