@@ -91,7 +91,7 @@ class collate_fn_seq_batched():
 
     ```python
     >>> batch_size = 32
-    >>> seq_length = 513
+    >>> seq_length = 512
     >>> loader_train_seq_batched = torch.utils.data.DataLoader(ds, num_workers=0, 
     >>>                                                        batch_sampler=SequentialSamplerBatched(len(ds), seq_length, batch_size),
     >>> for xb, yb in loader_train_seq_batched:
@@ -104,8 +104,8 @@ class collate_fn_seq_batched():
         None
         
     def __call__(self, samples):
-        x_stacked = torch.cat([s[0][None, :, :] for s in samples], dim=0)
-        y_stacked = torch.cat([s[1][None, :, :] for s in samples], dim=0)
+        x_stacked = torch.cat([s[0][:, None, :] for s in samples], dim=1)
+        y_stacked = torch.cat([s[1][:, None, :] for s in samples], dim=1)
         return x_stacked, y_stacked
 
 
