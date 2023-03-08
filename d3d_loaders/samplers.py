@@ -107,32 +107,7 @@ class collate_fn_seq_batched():
         x_stacked = torch.cat([s[0][:, None, :] for s in samples], dim=1)
         y_stacked = torch.cat([s[1][:, None, :] for s in samples], dim=1)
         return x_stacked, y_stacked
-
-
-class SequentialBatchedSampler_multi(Sampler):
-    r"""Sample batched, linear sequences from multishot dataset.
-    
-    Args:
-        num_elements (List[Int]): Elements per dataset.
-        seq_length (Int) : Length of sequences to sample
-        batch_size (Int) : Number of sequences to return per iteration.
-    """
-    def __init__(self, num_elements, seq_length, batch_size):
-        self.num_elements = num_elements
-        self.num_shots = len(num_elements)
-        self.seq_length = seq_length
-        self.batch_size = batch_size
-
-    def __iter__(self):
-        """Return a batch of linear sequences.
-        
-        * Always exhaust one dataset, even if it means that the batch will be smaller than 
-          requested batch_size, before continuing on the next shot.
-        """
-        for s in range(0, self.num_shots):
-            for start in range(0, self.num_elements[s] - self.seq_length - 1, self.batch_size):
-                yield [(s, range(start + b, start + b + self.seq_length + 1)) for b in range(self.batch_size) if start + b + self.seq_length + 1 <= self.num_elements[s]]
-        
+      
 
 class RandomSampler(Sampler[int]):
     r"""Samples sequences randomly, without replacement.
@@ -230,7 +205,7 @@ class collate_fn_random_batch_seq():
         return x_stacked, y_stacked
 
 
-class RandomBatchedSampler_multishot():
+class BatchedSampler_multi():
     r"""Randomly samples batched sequences from multi-shot dataset without replacement.
     
     Works similar to RandomBatchedSampler, but spreads sampling out over multiple datasets.
@@ -240,22 +215,36 @@ class RandomBatchedSampler_multishot():
         seq_length (Int) : Length of sequences to sample
         batch_size (Int) : Number of sequences to return per iteration.
     """
-    def __init__(self, num_elements, seq_length, batch_size):
+    def __init__(self, num_elements, seq_length, batch_size, shuffle=False, seed=0):
         self.num_elements = num_elements
         self.num_shots = len(num_elements)
         self.seq_length = seq_length
         self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.seed = seed
+        self.epoch = 0
         
         if self.batch_size >= min(num_elements):
             raise ValueError("Batch size must be smaller than the size of the dataset. ")
+
+    def set_epoch(self, epoch):
+        """Sets epoch for this sampler.
+        When :attr:`shuffle=True`, this ensures all replicas
+        use a different random ordering for each epoch. Otherwise, the next iteration of this
+        sampler will yield the same ordering.
+        
+        Args:
+            epoch (int) : Epoch number
+        """
+        self.epoch = epoch
 
     def __iter__(self): # -> Iterator[int]:
         """Returns a batch of fixed length sequences, starting at random."""
         # Randomly shuffle starting indices for each shot
         idx_permuted = [(s, i)  for s in range(self.num_shots) for i in range(self.num_elements[s] - self.seq_length)]
-        #idx_permuted = [(s, i) for s in range(num_shots) for i in range(num_elements[s] - seq_length) ]
-        random.shuffle(idx_permuted)
-
+        if self.shuffle:
+            random.seed(self.seed + self.epoch)
+            random.shuffle(idx_permuted)
         
         full_batches = len(idx_permuted) // self.batch_size # Number of batches we can fill with the specified batch size
         # Check if the last batch is full or partial
@@ -268,8 +257,6 @@ class RandomBatchedSampler_multishot():
             partial_batch = False
             num_batches = full_batches
      
-        # Number of batches to draw. Round up.
-        #num_batches = self.num_shots * (self.num_elements - self.seq_length) // self.batch_size
         for ix_b in range(0, num_batches):
             # If ix_x is full_batches (remember 0-based indexing and num_batches is excludede in range)
             # we have need to fill a partial batch with the remaining samples.
@@ -288,7 +275,7 @@ class RandomBatchedSampler_multishot():
             yield [(s[0], range(s[1], s[1] + self.seq_length + 1)) for s in selected]
 
 
-class collate_fn_random_batch_seq_multi():
+class collate_fn_batch_multi():
     r"""Stacks samples from RandomBatchedSampler_multishot into single tensors.
     Output should have shape (L, N, H), batch_first=False:
     https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html
