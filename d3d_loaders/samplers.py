@@ -18,13 +18,31 @@ class BatchedSampler(Sampler):
 
     Similar to SequentialSampler, but returns a batch of sequences in each iteration.
     """
-    def __init__(self, num_elements, seq_length, batch_size, shuffle=False, seed=0):
+    def __init__(self, num_elements, seq_length, batch_size, num_replicas=None, rank=None, shuffle=False, seed=0):
         self.num_elements = num_elements  # Length of the dataset
         self.seq_length = seq_length      # Length of the sequences to sample
         self.batch_size = batch_size      # Batch size
+        self.num_replicas = num_replicas  # MPI_COMM_WORLD size
+        self.rank = rank                  # rank of current worker
         self.shuffle = shuffle            # Shuffle the start of the sequences?
         self.seed = seed                  # Seed for shuffling
         self.epoch = 0                    # Increase this after each epoch to get different shuffling in next iteration
+
+        # Code below copied from https://pytorch.org/docs/stable/_modules/torch/utils/data/distributed.html#DistributedSampler
+        # Default initialization matches rank/world size.
+        # keep None if we don't use distributed.
+        if num_replicas is None:
+            if not dist.is_available():
+                raise RuntimeError("Requires distributed package to be available")
+            num_replicas = dist.get_world_size()
+        if rank is None:
+            if not dist.is_available():
+                raise RuntimeError("Requires distributed package to be available")
+            rank = dist.get_rank()
+        if rank >= num_replicas or rank < 0:
+            raise ValueError(
+                f"Invalid rank {rank}, rank should be in the interval"
+                f" [0, {num_replicas - 1}]")
     
     def set_epoch(self, epoch):
         """Update epoch to adjust random seed."""
@@ -36,14 +54,14 @@ class BatchedSampler(Sampler):
         if self.shuffle:
             random.seed(self.seed + self.epoch)
             random.shuffle(idx_permuted)
+
+        # sub-sample per rank. Each rank starts at a different offset, skipping num_replicas samples
+        idx_permuted = idx_permuted[self.rank:self.num_elements:self.num_replicas]
                       
         # Slicing the list like this takes care of partial batches
         for start in range(0, len(idx_permuted), self.batch_size):
             yield [range(ix, ix + self.seq_length + 1) for ix in idx_permuted[start:start+self.batch_size]]
 
-
-
-      
 
 class BatchedSampler_multi():
     r"""Randomly samples batched sequences from multi-shot dataset without replacement.
@@ -54,8 +72,10 @@ class BatchedSampler_multi():
         num_elements (List[Int]): Elements per dataset.
         seq_length (Int) : Length of sequences to sample
         batch_size (Int) : Number of sequences to return per iteration.
+        num_replicas (Int) : Number of processes participating in distributed training
+        rank (Int): Rank of the current processes. By default, retrieved from distributed training group
     """
-    def __init__(self, num_elements, seq_length, batch_size, shuffle=False, seed=0):
+    def __init__(self, num_elements, seq_length, batch_size, num_replicas=None, rank=None, shuffle=False, seed=0):
         self.num_elements = num_elements
         self.num_shots = len(num_elements)
         self.seq_length = seq_length
@@ -63,10 +83,26 @@ class BatchedSampler_multi():
         self.shuffle = shuffle
         self.seed = seed
         self.epoch = 0
-        
-        if self.batch_size >= min(num_elements):
-            raise ValueError("Batch size must be smaller than the size of the dataset. ")
 
+        if self.batch_size >= sum(num_elements):
+                raise ValueError("Batch size must be smaller than the size of the dataset. ")
+
+        if num_replicas is None:
+            if not dist.is_available():
+                raise RuntimeError("Requires distributed package to be available")
+            num_replicas = dist.get_world_size()
+        if rank is None:
+            if not dist.is_available():
+                raise RuntimeError("Requires distributed package to be available")
+            rank = dist.get_rank()
+        if rank >= num_replicas or rank < 0:
+            raise ValueError(
+                f"Invalid rank {rank}, rank should be in the interval"
+                f" [0, {num_replicas - 1}]")
+        self.num_replicas = num_replicas
+        self.rank = rank
+        
+   
     def set_epoch(self, epoch):
         """Sets epoch for this sampler.
         When :attr:`shuffle=True`, this ensures all replicas
@@ -85,6 +121,11 @@ class BatchedSampler_multi():
         if self.shuffle:
             random.seed(self.seed + self.epoch)
             random.shuffle(idx_permuted)
+
+        # Sub-sample for replicas.
+        ll = len(idx_permuted)
+        idx_permuted = idx_permuted[self.rank:ll:self.num_replicas]
+        # After rank sub-sampling, do batching on the sub-sampled elements.
         
         full_batches = len(idx_permuted) // self.batch_size # Number of batches we can fill with the specified batch size
         # Check if the last batch is full or partial
