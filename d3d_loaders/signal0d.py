@@ -17,14 +17,7 @@ import importlib.resources
 
 
 class signal_base():
-    """Base class for a sample.
-
-    Represents a signal over [tstart:tend].
-    Aims to use data stored in /projects/EKOLEMEN/aza_lenny_data1/template.
-    Check README for currently supported signals.
-
-
-    """
+    """Base class for 0d (scalar) signals. """
     def __init__(self, shotnr, time_sampler, standardizer, datapath, device=torch.device("cpu")):
         """Load data from HDF5 file, standardize, and move to device.
 
@@ -139,7 +132,7 @@ class signal_pinj(signal_base):
         fp = h5py.File(join(self.datapath, f"{self.shotnr}.h5")) 
         # Collect the time base using the 15l signal
         tb = torch.tensor(fp["pinjf_15l"]["xdata"][:]) # Get time-base
-        t_inds = self._get_time_sampling(tb)
+        t_inds = self.time_sampler.get_sample_indices(tb).numpy()
         # Sum the contributions from all neutral beams specified in the collect_keys list.
         pinj_data = sum([torch.tensor(fp[k]["zdata"][:])[t_inds] for k in self.collect_keys])
         fp.close()

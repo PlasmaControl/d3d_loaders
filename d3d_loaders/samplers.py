@@ -6,6 +6,7 @@
 
 import torch
 from torch.utils.data import Sampler
+import torch.distributed as dist
 from typing import Sequence, Iterator
 import random
 import logging
