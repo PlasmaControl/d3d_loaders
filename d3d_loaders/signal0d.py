@@ -160,14 +160,33 @@ def signal_factory(full_name):
     When dispatching to HDF5, the signal class will use self.key to access the relevant 
     data group. This key is taken from the signal definition signals_0d.yaml
 
+    This factory needs to be able to import d3d_signals. Make sure you have the module
+    https://github.com/PlasmaControl/d3d_signals
+    checked out and are able to import it, that is,
+    >>> import d3d_loaders
+    should work.
+
     """
     assert(full_name[:7] == "signal_")
     short_name = full_name[7:]   # The part after signal_
 
     # Access signal definition from yaml files: 
-    # https://stackoverflow.com/questions/72886257/why-use-importlib-resources-over-file
+    # s = Sour
     # Use importlib to guarantee path safety
-    resource_path = importlib.resources.files("d3d_signals")
+    try:
+        resource_path = importlib.resources.files("d3d_signals")
+    except ModuleNotFoundError as e:
+        print("Could not load submodule 'd3d_signals'")
+        print("Please manually import the subfolder 'd3d_signals' in the script you are running from")
+        print("")
+        print(">>> import sys")
+        print(">>> sys.path.append(/path/to/d3d_signals)")
+        print(">>> import d3d_signals")
+
+        raise e
+
+
+
     with open(join(resource_path, "signals_0d.yaml"), "r") as fp:
         signals_0d = yaml.safe_load(fp)
    
