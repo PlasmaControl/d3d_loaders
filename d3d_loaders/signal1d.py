@@ -9,10 +9,13 @@ import numpy as np
 
 import h5py
 import torch
+import yaml
 
 import logging
-import sys
-sys.path.append("..")
+#import sys
+#sys.path.append("..")
+
+import importlib.resources
 
 from d3d_loaders.signal0d import signal_base
 from d3d_loaders.rcn_functions import rcn_infer
@@ -87,6 +90,8 @@ def profile_factory(full_name):
     with open(join(resource_path, "signals_1d.yaml"), "r") as fp:
         signals_1d = yaml.safe_load(fp)
    
+    print(signals_1d)
+
     # Define __init__ function for new signal
     def __init__(self, shotnr, time_sampler, std, datapath, device):
         self.name = short_name
