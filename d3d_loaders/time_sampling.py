@@ -7,7 +7,7 @@
 import torch
 import numpy as np
 import logging
-from scipy import interpolate
+from scipy.interpolate import interp1d
 
 class sampler_base:
     """Resamples signals on given time base
@@ -94,8 +94,7 @@ class sampler_linearip(sampler_base):
         if isinstance(tb, torch.Tensor):
             tb = tb.numpy()
 
-        #print("resample, tb = ", tb, ", tb_new = ", self.tb_new)
-        f = interpolate.interp1d(tb, signal)
+        f = interp1d(tb, signal)
         sig_rs = f(self.tb_new)
         # Somewhere in this routine, float32 (input) gets converted to float64.
         # Enforce output type here.
@@ -106,10 +105,43 @@ class sampler_linearip(sampler_base):
 
 
 
+class sampler_space():
+    """Spatial resampling for profiles."""
+    def __init__(self, x_new):
+        """Set up interpolation to new spatial basis.
 
+        This method just checks if the new points are sorted and stores them.        
+        Args:
+           
+            x_new (ndarray): Collocation points of new profile
+        """
+        # Test if new collocation points are sorted
+        assert(((x_new[1:] - x_new[:-1]) > 0.0).all())
+        self.x_new = np.array(x_new)
+        
+    def __call__(self, x_old, prof_old):
+        """Interpolate array from old to new collocation points.
+        
+        Args:
+            x_old (np.ndarray) : Collocation points of the profile
+            prof_old: Profile values on old collocation points. Dim0: spatial points. Dim1: Time dimension
+            
+        Returns:
+            prof_new: Profile values at new collocation points.
+        """
+        # Test if both, old and new collocation points are sorted
+        assert(((x_old[1:] - x_old[:-1]) > 0.0).all())
+        # Assert that new collocations points are within original bounds
+        # No extrapolation
+        assert((self.x_new[0] - x_old[0]).item() >= 0.0)
+        assert((self.x_new[-1] - x_old[-1]).item() <= 0.0)
+        x_old = np.array(x_old)
 
-
-
-
+        # Interpolate profile on x_new and return.
+        ip = interp1d(x_old, prof_old, axis=1)
+        prof_new = ip(self.x_new)
+        
+        return prof_new
+        
 
 # end of file time_sampling.py

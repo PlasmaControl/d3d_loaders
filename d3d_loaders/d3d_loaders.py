@@ -4,13 +4,18 @@
 Implements an iterable dataset for the HDF5 data stored in
 /projects/EKOLEMEN/aza_lenny_data1
 """
-
-import torch
-from d3d_loaders.signal0d import *
-from d3d_loaders.signal1d import *
-from d3d_loaders.targets import *
-
+from os.path import join
+import importlib.resources
 import logging
+import torch
+import yaml
+
+
+import d3d_signals
+
+from d3d_loaders.signal0d import signal_base, signal_pinj, signal_factory
+from d3d_loaders.signal1d import signal_1d_base, profile_factory
+from d3d_loaders.targets import target_ttd
 
 
 class D3D_dataset(torch.utils.data.Dataset):
@@ -25,6 +30,7 @@ class D3D_dataset(torch.utils.data.Dataset):
                  targets,
                  sampler_pred,
                  sampler_targ,
+                 ip_space,
                  standardizer_dict,
                  datapath,
                  device=torch.device("cpu")):
@@ -44,6 +50,9 @@ class D3D_dataset(torch.utils.data.Dataset):
 
         sampler_targ : class `sampler_base`
             Time sampler for targets. May be different to allow time shifting etc.
+
+        ip_space : class `sampler_space`
+            Interpolator for profiles
 
         standardizer_dict : dict {name : class `standardizer`}
             Provides individual standardizer for each predictor/target
@@ -74,6 +83,7 @@ class D3D_dataset(torch.utils.data.Dataset):
         self.shotnr = shotnr
         self.sampler_pred = sampler_pred
         self.sampler_targ = sampler_targ
+        self.ip_space = ip_space
         self.standardizer_dict = standardizer_dict
         self.device = device
         logging.info(f"Using device {device}")
@@ -81,17 +91,39 @@ class D3D_dataset(torch.utils.data.Dataset):
         self.predictors = {}
         self.targets = {}
 
-        # Initialize all predictors
+        # Load signal definitions
+        resource_path = importlib.resources.files("d3d_signals")
+        with open(join(resource_path, "signals_0d.yaml"), "r") as fp:
+            self.signals_0d = yaml.safe_load(fp)
+
+        with open(join(resource_path, "signals_1d.yaml"), "r") as fp:
+            self.signals_1d = yaml.safe_load(fp)
+
+
+        # Initialize all predictors. These can be either signals with special constructor, scalar or profile time series
+        names_scalars = list(self.signals_0d.keys())
+        names_profiles = list(self.signals_1d.keys())
         logging.info("----Building predictor signals")
         for pred_name in predictors:
             logging.info(f"Adding {pred_name} to predictor list.")
+            # Find out wh
+
             # There are some signals that have a custom constructor.
             if pred_name == "pinj":
                 self.predictors[pred_name] = signal_pinj(shotnr, self.sampler_pred, self.standardizer_dict[pred_name], self.datapath, self.device)
-            # For all other signals, use the signal factory
-            else: 
+                continue
+
+            # For all other signals, see if we need to instantiate a scalar or profile
+            if pred_name in names_scalars: 
                 new_signal = signal_factory(f"signal_{pred_name}")
                 self.predictors[pred_name] = new_signal(shotnr, self.sampler_pred, self.standardizer_dict[pred_name], self.datapath, self.device)
+            elif pred_name in names_profiles:
+                new_signal = profile_factory(f"signal_{pred_name}")
+                self.predictors[pred_name] = new_signal(shotnr, self.sampler_pred, self.ip_space, self.standardizer_dict[pred_name], self.datapath, self.device)
+            else:
+                logging.error(f"Signal for predictor {pred_name} not found")
+
+                print(f"Signal for predictor {pred_name} not found")
 
             
         logging.info("----Building target signals")

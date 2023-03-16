@@ -12,20 +12,40 @@ import torch
 import yaml
 
 import logging
-#import sys
-#sys.path.append("..")
 
-import importlib.resources
 
 from d3d_loaders.signal0d import signal_base
 from d3d_loaders.rcn_functions import rcn_infer
 
+import importlib.resources
+import d3d_signals
+
 
 class signal_1d_base(signal_base):
     """Base class for a 1d sample (profiles etc)."""
-    def __init__(self, shotnr, time_sampler, standardizer, datapath, device=torch.device("cpu")):
-        # Same setup as the 0d signal base class, but this uses a custom _cache_data.
+    def __init__(self, shotnr, time_sampler, x_sampler, standardizer, datapath, device=torch.device("cpu")):
+        """Handle loading from HDF5, time and spatial IP, standardization etc.
+
+        Args:
+        ----------
+        shotnr : int
+                 Shot number
+        time_sampler : class `causal_sampler`. 
+                Defines the timebase on which we need the signal
+        x_sampler: class `space_sampler`
+                Defines spatial points on which to interpolate the signal
+        standardizer : class `standardizer`
+                Defines standardization of the dataset.         
+        datapath : string, default='/projects/EKOLEMEN/aza_lenny_data1'
+                   Basepath where HDF5 data is stored.  
+        device : string, default='cpu'
+                 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        """
+        # Same setup as the 0d signal base class, but this uses a custom _cache_data to handle spatial interpolation
+        self.x_sampler = x_sampler
         super().__init__(shotnr, time_sampler, standardizer, datapath, device)
+        assert(self.data.dtype == torch.float32)
 
     def _cache_data(self):
         """Load 2d profile from hdf5 data file.
@@ -47,22 +67,39 @@ class signal_1d_base(signal_base):
         except ValueError as e:
             logging.error(f"Unable to load timebase for shot {self.shotnr} signal {self.name}")
             raise e
-
-        
+       
         # Some shots have no data for a given signal. In that case, the tensor is present in the
         # dataset but the size is 0. Throw an error if that is the case.
         if tb.shape[0] < 2:
             fp.close()
             raise ValueError(f"Shot {self.shotnr}, signal {self.key}: Timebase in HDF5 file has length {tb.shape[0]} < 2!")
         
+        # Time interpolation 
         t_inds = self.time_sampler.get_sample_indices(tb).numpy()
-        prof_data = fp[self.key]["zdata"][:].T
-        prof_data = torch.tensor(prof_data[t_inds, :])
+        # Load data at specified indices. Transpose so that
+        # dim0: time
+        # dim1: space
+        prof_data = fp[self.key]["zdata"][:,:]
+        prof_data = prof_data[:, t_inds].T
+        print(f"1. {prof_data.dtype}")
+
+        # Load profile sampling points from HDF5.
+        xb = fp[self.key]["ydata"][:]
+        print(f"1. {xb.dtype}")
+        # Resample the profile from the points provided in the datafile to the points the sampler defines
+        prof_data = self.x_sampler(xb, prof_data)
+        print(f"2. {prof_data.dtype}")
+
+        # Finally, cast to torch tensor
+        prof_data = torch.tensor(prof_data)
+        print(f"3. {prof_data.dtype}")
+
 
         fp.close()
-
         elapsed = time.time() - t0_p
         logging.info(f"Caching {self.name} data for {self.shotnr} took {elapsed}s")
+
+
         
         return prof_data
 
@@ -90,14 +127,12 @@ def profile_factory(full_name):
     with open(join(resource_path, "signals_1d.yaml"), "r") as fp:
         signals_1d = yaml.safe_load(fp)
    
-    print(signals_1d)
-
     # Define __init__ function for new signal
-    def __init__(self, shotnr, time_sampler, std, datapath, device):
+    def __init__(self, shotnr, time_sampler, x_sampler, std, datapath, device):
         self.name = short_name
         self.key = signals_1d[short_name]["map_to"]
         
-        signal_1d_base.__init__(self, shotnr, time_sampler, std, datapath, device=torch.device("cpu"))
+        signal_1d_base.__init__(self, shotnr, time_sampler, x_sampler, std, datapath, device=torch.device("cpu"))
         
     newclass = type(full_name, (signal_1d_base, ), {"__init__": __init__})
     return newclass

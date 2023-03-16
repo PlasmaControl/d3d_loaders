@@ -4,16 +4,16 @@
 
 from os.path import join
 import time
+import logging
 
 import numpy as np
 import h5py
 import torch
 import yaml
 
-import logging
-
 import importlib.resources
 
+import d3d_signals
 
 
 class signal_base():
