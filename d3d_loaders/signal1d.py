@@ -81,18 +81,14 @@ class signal_1d_base(signal_base):
         # dim1: space
         prof_data = fp[self.key]["zdata"][:,:]
         prof_data = prof_data[:, t_inds].T
-        print(f"1. {prof_data.dtype}")
 
         # Load profile sampling points from HDF5.
         xb = fp[self.key]["ydata"][:]
-        print(f"1. {xb.dtype}")
         # Resample the profile from the points provided in the datafile to the points the sampler defines
         prof_data = self.x_sampler(xb, prof_data)
-        print(f"2. {prof_data.dtype}")
 
         # Finally, cast to torch tensor
         prof_data = torch.tensor(prof_data)
-        print(f"3. {prof_data.dtype}")
 
 
         fp.close()

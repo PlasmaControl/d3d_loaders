@@ -64,10 +64,89 @@ class BatchedSampler(Sampler):
             yield [range(ix, ix + self.seq_length + 1) for ix in idx_permuted[start:start+self.batch_size]]
 
 
+
 class BatchedSampler_multi():
     r"""Randomly samples batched sequences from multi-shot dataset without replacement.
     
     Works similar to RandomBatchedSampler, but spreads sampling out over multiple datasets.
+    
+    Args:
+        num_elements (List[Int]): Elements per dataset.
+        seq_length (Int) : Length of sequences to sample
+        batch_size (Int) : Number of sequences to return per iteration.
+        num_replicas (Int) : Number of processes participating in distributed training
+        rank (Int): Rank of the current processes. By default, retrieved from distributed training group
+    """
+    def __init__(self, num_elements, seq_length, batch_size, num_replicas=None, rank=None, shuffle=False, seed=0):
+        self.num_elements = num_elements
+        self.num_shots = len(num_elements)
+        self.seq_length = seq_length
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.seed = seed
+        self.epoch = 0
+
+        if self.batch_size >= sum(num_elements):
+                raise ValueError("Batch size must be smaller than the size of the dataset. ")
+       
+   
+    def set_epoch(self, epoch):
+        """Sets epoch for this sampler.
+        When :attr:`shuffle=True`, this ensures all replicas
+        use a different random ordering for each epoch. Otherwise, the next iteration of this
+        sampler will yield the same ordering.
+        
+        Args:
+            epoch (int) : Epoch number
+        """
+        self.epoch = epoch
+
+    def __iter__(self): # -> Iterator[int]:
+        """Returns a batch of fixed length sequences, starting at random."""
+        # Randomly shuffle starting indices for each shot
+        idx_permuted = [(s, i)  for s in range(self.num_shots) for i in range(self.num_elements[s] - self.seq_length)]
+        if self.shuffle:
+            random.seed(self.seed + self.epoch)
+            random.shuffle(idx_permuted)
+
+        # Sub-sample for replicas.
+        ll = len(idx_permuted)
+        #idx_permuted = idx_permuted[self.rank:ll:self.num_replicas]
+        # After rank sub-sampling, do batching on the sub-sampled elements.
+        
+        full_batches = len(idx_permuted) // self.batch_size # Number of batches we can fill with the specified batch size
+        # Check if the last batch is full or partial
+        # We iterate up to num_batches. If in the loop the batch_counter == full_batches, we will have a partial patch
+        if len(idx_permuted) != full_batches * self.batch_size:
+            remaining_samples = len(idx_permuted) - full_batches * self.batch_size
+            num_batches = full_batches + 1
+        else: 
+            num_batches = full_batches
+     
+        for ix_b in range(0, num_batches):
+            # If ix_x is full_batches (remember 0-based indexing and num_batches is excludede in range)
+            # we have need to fill a partial batch with the remaining samples.
+            if ix_b == full_batches:  
+                selected = idx_permuted[-remaining_samples:]
+            else:
+                # Fill a full batch
+                # Select starting points for sequences
+                selected = idx_permuted[(ix_b * self.batch_size):((ix_b + 1) * self.batch_size)]
+            # Remember to return a list. PyTorch dataloader passes each item in the
+            # returned list to dataset.__getidx__. If we only return a single list,
+            # each scalar index in that list would be passed to __getidx__.
+            # If we return a list of lists, that inner list will be passed to __getidx__.
+            # Then this list will be used for indexing.
+            # Long story short: pass list of lists, not a single list.
+            yield [(s[0], range(s[1], s[1] + self.seq_length + 1)) for s in selected]
+
+
+
+
+class BatchedSampler_multi_dist():
+    r"""Randomly samples batched sequences from multi-shot dataset without replacement.
+    
+    Works like BatchedSampler_multi, but spreads sampling out over multiple datasets.
     
     Args:
         num_elements (List[Int]): Elements per dataset.

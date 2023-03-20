@@ -187,44 +187,24 @@ class Multishot_dataset():
     
     It's basically a list of D3D_datasets. But the __getindex__ function is smart,
     mapping a sequential index onto individual member datasets.
-
-    Example use-case
-
-    >>> shot_list_train = [172337, 172339] 
-    >>> tstart = 110.0 # Time of first sample for upper triangularity is 100.0
-    >>> tend = 2000.0
-    >>> t_params = {"tstart": tstart, "tend": tend, "tsample": 1.0}
-    >>> t_shift = 10.0
-    >>> device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    >>> seq_length = 512
-    >>> batch_size = 4
-    >>> pred_list = ["pinj", "tinj", "ae_prob"]
-    >>> targ_list = ["ae_prob"]
-    >>> ds_train = Multishot_dataset(shot_list_train, t_params, pred_list, targ_list, {"ae_prob": t_shift}, "/projects/EKOLEMEN/d3dloader/test", device)
-    >>> loader_train_b = torch.utils.data.DataLoader(ds_train, num_workers=0, 
-    >>>                                              batch_sampler=RandomBatchSequenceSampler_multids(2, len(ds_train.datasets[0]), seq_length, batch_size),
-    >>>                                              collate_fn = collate_fn_random_batch_seq_multi(batch_size))
-    >>> for xb, yb in loader_train_b:
-            print(xb.shape, yb.shape)
-            break
-    torch.Size([513, 4, 7]) torch.Size([513, 4, 5])
-
-    
+   
     Args:
-        shotlist: list[int]
-        t_params: dict
-        predictors: list[string]
-        targets: list[string]
-        shift_targets: dict
+        shotlist: list[int]        : List of shots in the dataset
+        predictors: list[string]   : 
+        targets: list[string]      :
+        sampler_pred_dict          :
+        sampler_targ_dict          :
+        ip_space                   : 
+        std_dict                   :
         datapath: string
         device: torch.device
     """
-    def __init__(self, shotlist, predictors, targets, sampler_pred_dict, sampler_targ_dict, std_dict, datapath, device=torch.device("cpu")):
+    def __init__(self, shotlist, predictors, targets, sampler_pred_dict, sampler_targ_dict, ip_space, std_dict, datapath, device=torch.device("cpu")):
         # Create list of D3D_datasets
         self.datasets = []
         for shotnr in shotlist:
             self.datasets.append(D3D_dataset(shotnr, predictors, targets, sampler_pred_dict[shotnr], 
-                                 sampler_targ_dict[shotnr], std_dict, datapath, device))
+                                 sampler_targ_dict[shotnr], ip_space, std_dict, datapath, device))
         
         
     def shot(self, idx: int):
