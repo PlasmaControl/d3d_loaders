@@ -181,7 +181,8 @@ class BatchedSampler_multi_dist():
                 f" [0, {num_replicas - 1}]")
         self.num_replicas = num_replicas
         self.rank = rank
-        
+        logging.info(f"BatchedSampler_multi_dist: rank={self.rank}/{self.num_replicas}")
+
    
     def set_epoch(self, epoch):
         """Sets epoch for this sampler.

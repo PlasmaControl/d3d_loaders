@@ -7,6 +7,7 @@ in HDF5 files. It also contains custom [samplers](https://pytorch.org/docs/stabl
 [data loaders](https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader).
 
 
+
 Load Multiple Signals in Single Dataset
 =======================================
 
@@ -270,6 +271,12 @@ data = sig_neut.data.numpy()
 
 Full training examples
 ======================
+
+Training examples can be found in [this repository](https://github.com/PPPLDeepLearning/frnn_examples).
+The dataset these examples operate on can be found [here](https://github.com/PPPLDeepLearning/dataset_D3D_100).
+
+
+
 
 The folder `examples` contains several notebooks that illustrate how to train predictive
 models using the infrastructure provided in this package. In particular, the notebook
