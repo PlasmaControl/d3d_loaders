@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
 """
-Implements an iterable dataset for the HDF5 data stored in
-/projects/EKOLEMEN/aza_lenny_data1
+Implements an iterable dataset for D3D data stored in HDF5 format.
 """
 from os.path import join
 import importlib.resources
@@ -20,8 +19,6 @@ from d3d_loaders.targets import target_ttd
 
 class D3D_dataset(torch.utils.data.Dataset):
     """Implements an iterable dataset for D3D data.
-
-    Target is the HDF5 data stored in /projects/EKOLEMEN/aza_lenny_data1.
     
     https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset
     """
@@ -59,25 +56,7 @@ class D3D_dataset(torch.utils.data.Dataset):
                        
         device : string
                  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-        Timebase of
-        * ECE: dt_ece = 2e-3 ms
-        * Pinj: dt_p = 1e-2 ms
-        * Neutrons: dt_neu = 2e-2ms
-
-        At each iteration, the data loader fetches a set of data for a given  shot for t0.
-        In addition, the loader returns the target at a time t0 + shift_target
-
-        For example, `t_params = {"tstart": 100.0, "tend": 2000.0, "tsample": 1.0}` will
-        have all predictors signals span 100.0 - 2000.0 ms, with a sample length of 1.0ms.
-        That is, the signals are 1900 elements each.
-        The length of the target signals is the same. When shift_targets=None, the target
-        signals will be identical to those defined in the predictor.
-        When defining f.ex. `shift_targets = {"ae_prob": 10.0}`, the predictor signals `ae_prob`
-        will be 10 samples (= 10.0ms / 1.0ms) ahead of the target signal.
-
         """
-
         super(D3D_dataset).__init__()
         self.datapath = datapath
         self.shotnr = shotnr
@@ -189,15 +168,24 @@ class Multishot_dataset():
     mapping a sequential index onto individual member datasets.
    
     Args:
-        shotlist: list[int]        : List of shots in the dataset
-        predictors: list[string]   : 
-        targets: list[string]      :
-        sampler_pred_dict          :
-        sampler_targ_dict          :
-        ip_space                   : 
-        std_dict                   :
+        shotlist : list[int]
+            List of shots in the dataset
+        predictors : list[string]
+            List of predictors, see yaml files in d3d_signals
+        targets : list[string]
+            List of targets. Needs to be a group in the HDF5 files
+        sampler_pred : class `sampler_base`
+            Provides a uniform time sampler for each predictor
+        sampler_targ : class `sampler_base`
+            Time sampler for targets. May be different to allow time shifting etc.
+        ip_space : class `sampler_space`
+            Interpolator for profiles
+        standardizer_dict : dict {name : class `standardizer`}
+            Provides individual standardizer for each predictor/target
         datapath: string
+            Root path of the dataset
         device: torch.device
+            Optional. Device to store the data tensors on. Either CPU or GPU.
     """
     def __init__(self, shotlist, predictors, targets, sampler_pred_dict, sampler_targ_dict, ip_space, std_dict, datapath, device=torch.device("cpu")):
         # Create list of D3D_datasets
@@ -205,8 +193,7 @@ class Multishot_dataset():
         for shotnr in shotlist:
             self.datasets.append(D3D_dataset(shotnr, predictors, targets, sampler_pred_dict[shotnr], 
                                  sampler_targ_dict[shotnr], ip_space, std_dict, datapath, device))
-        
-        
+
     def shot(self, idx: int):
         r"""Quick access to individual shot"""
         return self.datasets[idx]
