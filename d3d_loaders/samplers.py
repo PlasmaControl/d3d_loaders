@@ -14,7 +14,39 @@ import logging
 
 
 
+
 class BatchedSampler(Sampler):
+    r"""Sample linear sequences, allows for batching and shuffling.
+
+    Similar to SequentialSampler, but returns a batch of sequences in each iteration.
+    """
+    def __init__(self, num_elements, seq_length, batch_size, num_replicas=None, rank=None, shuffle=False, seed=0):
+        self.num_elements = num_elements  # Length of the dataset
+        self.seq_length = seq_length      # Length of the sequences to sample
+        self.batch_size = batch_size      # Batch size
+        self.shuffle = shuffle            # Shuffle the start of the sequences?
+        self.seed = seed                  # Seed for shuffling
+        self.epoch = 0                    # Increase this after each epoch to get different shuffling in next iteration
+
+    
+    def set_epoch(self, epoch):
+        """Update epoch to adjust random seed."""
+        self.sepoch = epoch
+        
+    def __iter__(self):
+        """Returns fixed-length, ordered sequences that cover the dataset."""
+        idx_permuted = [(ix) for ix in range(self.num_elements - self.seq_length )]
+        if self.shuffle:
+            random.seed(self.seed + self.epoch)
+            random.shuffle(idx_permuted)
+                      
+        # Slicing the list like this takes care of partial batches
+        for start in range(0, len(idx_permuted), self.batch_size):
+            yield [range(ix, ix + self.seq_length + 1) for ix in idx_permuted[start:start+self.batch_size]]
+
+
+
+class BatchedSampler_dist(Sampler):
     r"""Sample linear sequences, allows for batching and shuffling.
 
     Similar to SequentialSampler, but returns a batch of sequences in each iteration.

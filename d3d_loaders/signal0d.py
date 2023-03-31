@@ -150,12 +150,30 @@ def signal_factory(full_name):
         full_name (str) : Name of the signal. Needs to begin with "signal_"
         base_class (type) : Needs 
     
+        
+    This function returns a dynamically generated sub-class of signal_base.
+    
+    It follows the design principle that is called object factory. 
+
+
     See https://stackoverflow.com/questions/15247075/how-can-i-dynamically-create-derived-classes-from-a-base-class
 
     This works like this:
     >>> signal_efsli = signal_factory("signal_efsli")
     >>> efsli = signal_efsli(shotnr, sampler_causal(100.0, 1000.0, 1.0), std, datapath, "cpu")
     >>> plt.plot(np.arange(100.0, 1000.0, 1.0), efsli.data[:,0].numpy())
+
+    Here, signal_efsli is the definition of a class. The code above roughly does the same as
+    1. defining the class in code
+
+    class signal_efsli():
+        def __init___(self, ...)
+    ...
+    2. and the instantiating it.
+    efsli = signal_efsli(shotnr, sampler_causal...)
+
+    This function dynamically generates the class definition for signal_efsli.
+
 
     When dispatching to HDF5, the signal class will use self.key to access the relevant 
     data group. This key is taken from the signal definition signals_0d.yaml
@@ -185,8 +203,6 @@ def signal_factory(full_name):
 
         raise e
 
-
-
     with open(join(resource_path, "signals_0d.yaml"), "r") as fp:
         signals_0d = yaml.safe_load(fp)
    
@@ -197,6 +213,17 @@ def signal_factory(full_name):
         
         signal_base.__init__(self, shotnr, time_sampler, std, datapath, device=torch.device("cpu"))
         
+    # The magic here is that newclass is a !!!type!!!. In particular, newclass is not
+    # an instance of any class. But a type. A type like Int, or Float, or str.
+    #
+    # a = "foobar"  <---- a is an instance of str.
+    # b = 9         <---- b is an instance of int.
+    # c = type(b)   <---- c is an instance of a type.
+    # Now we can do things like
+    # d = c(9)      <---- d is an integer with value 9
+    # d + 12        <---- since d is an integer, we can add it to another integer.
+    # 21      
     newclass = type(full_name, (signal_base, ), {"__init__": __init__})
+    # Now we just return the object.
     return newclass
 

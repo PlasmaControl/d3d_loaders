@@ -14,7 +14,7 @@ import d3d_signals
 
 from d3d_loaders.signal0d import signal_base, signal_pinj, signal_factory
 from d3d_loaders.signal1d import signal_1d_base, profile_factory
-from d3d_loaders.targets import target_ttd
+from d3d_loaders.targets import target_ttd, target_ttelm
 
 
 class D3D_dataset(torch.utils.data.Dataset):
@@ -122,6 +122,8 @@ class D3D_dataset(torch.utils.data.Dataset):
             # Add other targets here
             elif target_name == "ttd":
                 self.targets[target_name] = target_ttd(shotnr, self.sampler_targ, self.datapath, self.device)
+            elif target_name == "ttelm":
+                self.targets[target_name] = target_ttelm(shotnr, self.sampler_targ, self.datapath, self.device)
             else:
                 raise(ValueError(f'{target_name} is not a valid target'))
 

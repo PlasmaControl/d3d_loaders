@@ -100,10 +100,10 @@ all of the same length and starting at the same random point. The sample below s
     800
 >>> batch_size = 32
 >>> seq_length = 512
-
+>>> sampler = BatchedSampler(len(ds), seq_length=seq_length, batch_size=batch_size, shuffle=True)
 >>> loader_train = torch.utils.data.DataLoader(my_ds, num_workers=0, 
-                                               batch_sampler=RandomBatchSequenceSampler(len(ds), seq_length=seq_length, batch_size=batch_size),
-                                               collate_fn = collate_fn_random_batch_seq(batch_size))
+                                               batch_sampler=sampler,
+                                               collate_fn = collate_fn_batched)
 
 >>> for x_b, y_b in loader_train:
         print(f"x_b.shape={x_b.shape}, y_b.shape={y_b.shape}")
@@ -129,23 +129,54 @@ The length of the sequences is `seq_length+1=513`. Note also, that the `predicto
 shifted `10ms` into the future. That is the samples at `y_b[:, -1, :]`  are `11ms` ahead
 of the samples in `x_b[:, -2, :]`. 
 
-In the example above, `collate_fn_random_batch_seq` reshapes the returned data
+In the example above, `collate_fn_batched` reshapes the returned data
 from `d3d_dataset.__getidx__` into a tuple of 2 tensors. The call semantics are explained in the
 code example [here](https://pytorch.org/docs/stable/data.html#disable-automatic-batching).
 Note that `RandomBatchSequenceSampler` takes care of batching. Automatic batching in the pytorch
 `DataLoader` needs to be disabled.
 
 
+The `BatchedSampler` can either sample sequences linearly, starting at 0, or shuffle
+the starting points of the sequences.
+
+For `shuffle=False`, `BatchedSampler` generates sequences where the starting index shifts by 1 for
+each sequence in a batch. Using a `BatchedSampler` in the example above would have
+the first sequence start at index 0 and extending to 512. The second sequence
+would start at index 1 and extend to 513. And so on.
+
+This is useful for inference, where we may want to predict a target sequentially over the 
+entire shot. We input samples of all predictors at time index 0...511 into the model and get a 
+prediction for the target at time index 512. Then we input the predictors at time index
+1..512 to predict the target at time index 513. And so in. Thus, by iterating over a
+DataLoader which uses a `BatchedSampler`, we can easily get a reconstruction of the
+predicted target for the entire shot.
+
+Setting `shuffle=True`, `BatchedSampler` generates sequences that start at a random point
+in the dataset. Looking at the code above, the first of the 32 sequences in the batch
+may start at index 18 (and extend to index 18+513=631) of the entire shot.
+The second sequence may start at index 788 and extend to index 788+513. 
+So every starting index is at random. This is useful for training.
+
+
+There are also the versions of the sampler `BatchedSampler_dist`. These should
+be used for distributed training. They effectively distribute all available samples
+in the dataset across ranks.
+
+
 
 Multi-shot datasets
 ===================
+
+THIS IS A BIT OUTDATED. THE INTERFACE TO THE MULTISHOT DATASET HAS CHANGED.
+SEE [https://github.com/PPPLDeepLearning/frnn_examples](https://github.com/PPPLDeepLearning/frnn_examples) FOR PROPER USAGE.
+
 The class `Multishot_dataset` defines a dataset that spans multiple shots. It can be instantiated in
 a very similar manner:
 
 ```python
 
 >>> from d3d_loaders.d3d_loaders import Multishot_dataset
->>> from d3d_loaders.samplers import RandomBatchSequenceSampler_multishot, collate_fn_random_batch_seq_multi
+>>> from d3d_loaders.samplers import BatchedSampler_multi, collate_fn_batched
 >>> shot_list_train = [172337, 172339] 
 >>> tstart = 110.0 # Time of first sample for upper triangularity is 100.0
 >>> tend = 2000.0
